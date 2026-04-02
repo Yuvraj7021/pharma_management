@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PharmaFlow - Backend Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-box {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .success {
+            color: #10b981;
+            font-weight: bold;
+        }
+        .error {
+            color: #ef4444;
+            font-weight: bold;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+        pre {
+            background: #f9fafb;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 PharmaFlow Backend Connection Test</h1>
+    
+    <div class="test-box">
+        <h2>1. Health Check</h2>
+        <button onclick="testHealth()">Test Backend Connection</button>
+        <div id="health-result"></div>
+    </div>
+
+    <div class="test-box">
+        <h2>2. Register User</h2>
+        <input type="email" id="reg-email" placeholder="Email" value="test@pharma.com">
+        <input type="password" id="reg-password" placeholder="Password" value="test123">
+        <input type="text" id="reg-name" placeholder="Name" value="Test User">
+        <br>
+        <button onclick="testRegister()">Register</button>
+        <div id="register-result"></div>
+    </div>
+
+    <div class="test-box">
+        <h2>3. Login</h2>
+        <input type="email" id="login-email" placeholder="Email" value="test@pharma.com">
+        <input type="password" id="login-password" placeholder="Password" value="test123">
+        <br>
+        <button onclick="testLogin()">Login</button>
+        <div id="login-result"></div>
+    </div>
+
+    <div class="test-box">
+        <h2>4. Get Medicines</h2>
+        <button onclick="testGetMedicines()">Fetch Medicines</button>
+        <div id="medicines-result"></div>
+    </div>
+
+    <div class="test-box">
+        <h2>5. Add Medicine</h2>
+        <button onclick="testAddMedicine()">Add Test Medicine</button>
+        <div id="add-medicine-result"></div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3001/api';
+        let token = null;
+
+        async function testHealth() {
+            const result = document.getElementById('health-result');
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                result.innerHTML = `<p class="success">✅ Backend is running!</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                result.innerHTML = `<p class="error">❌ Connection failed: ${error.message}</p>`;
+            }
+        }
+
+        async function testRegister() {
+            const result = document.getElementById('register-result');
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            const name = document.getElementById('reg-name').value;
+
+            try {
+                const response = await fetch(`${API_URL}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, name, role: 'admin' })
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    token = data.token;
+                    result.innerHTML = `<p class="success">✅ User registered!</p><pre>${JSON.stringify(data.user, null, 2)}</pre>`;
+                } else {
+                    result.innerHTML = `<p class="error">❌ ${data.error}</p>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<p class="error">❌ ${error.message}</p>`;
+            }
+        }
+
+        async function testLogin() {
+            const result = document.getElementById('login-result');
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    token = data.token;
+                    result.innerHTML = `<p class="success">✅ Login successful!</p><pre>Token: ${token.substring(0, 20)}...</pre>`;
+                } else {
+                    result.innerHTML = `<p class="error">❌ ${data.error}</p>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<p class="error">❌ ${error.message}</p>`;
+            }
+        }
+
+        async function testGetMedicines() {
+            const result = document.getElementById('medicines-result');
+            
+            if (!token) {
+                result.innerHTML = `<p class="error">❌ Please login first!</p>`;
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/medicines`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.innerHTML = `<p class="success">✅ Found ${data.length} medicines</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    result.innerHTML = `<p class="error">❌ ${data.error}</p>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<p class="error">❌ ${error.message}</p>`;
+            }
+        }
+
+        async function testAddMedicine() {
+            const result = document.getElementById('add-medicine-result');
+            
+            if (!token) {
+                result.innerHTML = `<p class="error">❌ Please login first!</p>`;
+                return;
+            }
+
+            const medicine = {
+                name: 'Test Medicine',
+                category: 'Test Category',
+                manufacturer: 'Test Manufacturer',
+                quantity_in_stock: 100,
+                unit: 'tablets',
+                reorder_level: 10,
+                unit_price: 50.00,
+                selling_price: 75.00,
+                batch_number: 'TEST001',
+                manufacturing_date: '2024-01-01',
+                expiry_date: '2025-12-31'
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/medicines`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(medicine)
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.innerHTML = `<p class="success">✅ Medicine added!</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    result.innerHTML = `<p class="error">❌ ${data.error}</p>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<p class="error">❌ ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

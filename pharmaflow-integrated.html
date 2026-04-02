@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PharmaFlow - Integrated System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .btn { padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-6">
+        <h1 class="text-3xl font-bold mb-6">🏥 PharmaFlow - Integrated System</h1>
+        
+        <!-- Navigation -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <div class="flex space-x-4">
+                <button onclick="showSection('dashboard')" class="btn btn-primary">Dashboard</button>
+                <button onclick="showSection('inventory')" class="btn btn-primary">Inventory</button>
+                <button onclick="showSection('prescriptions')" class="btn btn-primary">Prescriptions</button>
+                <button onclick="showSection('reports')" class="btn btn-primary">Reports</button>
+                <button onclick="showSection('ai')" class="btn btn-primary">AI Assistant</button>
+            </div>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div id="dashboard" class="section bg-white rounded-lg shadow p-6">
+            <h2 class="text-2xl font-bold mb-4">Dashboard</h2>
+            <div id="stats" class="grid grid-cols-4 gap-4"></div>
+        </div>
+
+        <!-- Inventory Section -->
+        <div id="inventory" class="section hidden bg-white rounded-lg shadow p-6">
+            <h2 class="text-2xl font-bold mb-4">Inventory Management</h2>
+            <button onclick="loadMedicines()" class="btn btn-primary mb-4">Load Medicines</button>
+            <div id="medicines-list"></div>
+        </div>
+
+        <!-- Prescriptions Section -->
+        <div id="prescriptions" class="section hidden bg-white rounded-lg shadow p-6">
+            <h2 class="text-2xl font-bold mb-4">Prescriptions</h2>
+            <div class="mb-4">
+                <h3 class="font-bold mb-2">Upload Prescription (PDF/Image)</h3>
+                <input type="file" id="prescription-file" accept=".pdf,.jpg,.jpeg,.png" class="mb-2">
+                <button onclick="uploadPrescription()" class="btn btn-primary">Upload</button>
+            </div>
+            <div id="prescriptions-list"></div>
+        </div>
+
+        <!-- Reports Section -->
+        <div id="reports" class="section hidden bg-white rounded-lg shadow p-6">
+            <h2 class="text-2xl font-bold mb-4">Reports</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="generateReport('expired')" class="btn btn-primary">Expired Medicines Report</button>
+                <button onclick="generateReport('low-stock')" class="btn btn-primary">Low Stock Report</button>
+                <button onclick="generateReport('sales')" class="btn btn-primary">Sales Report</button>
+                <button onclick="generateReport('inventory')" class="btn btn-primary">Full Inventory Report</button>
+            </div>
+            <div id="report-output" class="mt-4"></div>
+        </div>
+
+        <!-- AI Assistant Section -->
+        <div id="ai" class="section hidden bg-white rounded-lg shadow p-6">
+            <h2 class="text-2xl font-bold mb-4">🤖 AI Operations Assistant</h2>
+            <div class="bg-blue-50 p-4 rounded mb-4">
+                <p class="text-sm"><strong>I can help with:</strong></p>
+                <ul class="text-sm list-disc ml-5">
+                    <li>Inventory status and alerts</li>
+                    <li>Stock level analysis</li>
+                    <li>Expiry risk management</li>
+                    <li>Supplier information</li>
+                </ul>
+                <p class="text-sm text-red-600 mt-2"><strong>I cannot:</strong> Provide medical advice, prescriptions, or dosage recommendations</p>
+            </div>
+            <div id="chat-messages" class="h-64 overflow-y-auto bg-gray-50 p-4 rounded mb-4"></div>
+            <div class="flex">
+                <input type="text" id="ai-input" placeholder="Ask about inventory, stock, expiry..." class="flex-1 border p-2 rounded-l">
+                <button onclick="askAI()" class="btn btn-primary rounded-l-none">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3001/api';
+        let token = localStorage.getItem('pharmaflow_token');
+
+        function showSection(section) {
+            document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+            document.getElementById(section).classList.remove('hidden');
+            
+            if (section === 'dashboard') loadDashboard();
+        }
+
+        async function loadDashboard() {
+            try {
+                const [medicines, alerts] = await Promise.all([
+                    fetch(`${API_URL}/medicines`, { headers: { 'Authorization': `Bearer ${token}` }}).then(r => r.json()),
+                    fetch(`${API_URL}/alerts`, { headers: { 'Authorization': `Bearer ${token}` }}).then(r => r.json())
+                ]);
+
+                const stats = {
+                    total: medicines.length,
+                    expired: medicines.filter(m => new Date(m.expiry_date) < new Date()).length,
+                    lowStock: medicines.filter(m => m.quantity_in_stock <= 10).length,
+                    alerts: alerts.filter(a => !a.is_read).length
+                };
+
+                document.getElementById('stats').innerHTML = `
+                    <div class="bg-blue-100 p-4 rounded"><h3 class="font-bold">Total Medicines</h3><p class="text-2xl">${stats.total}</p></div>
+                    <div class="bg-red-100 p-4 rounded"><h3 class="font-bold">Expired</h3><p class="text-2xl">${stats.expired}</p></div>
+                    <div class="bg-yellow-100 p-4 rounded"><h3 class="font-bold">Low Stock</h3><p class="text-2xl">${stats.lowStock}</p></div>
+                    <div class="bg-green-100 p-4 rounded"><h3 class="font-bold">Alerts</h3><p class="text-2xl">${stats.alerts}</p></div>
+                `;
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        async function loadMedicines() {
+            try {
+                const response = await fetch(`${API_URL}/medicines`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const medicines = await response.json();
+                
+                document.getElementById('medicines-list').innerHTML = `
+                    <table class="w-full">
+                        <thead><tr class="bg-gray-100"><th class="p-2">Name</th><th>Category</th><th>Stock</th><th>Expiry</th></tr></thead>
+                        <tbody>
+                            ${medicines.map(m => `
+                                <tr class="border-b">
+                                    <td class="p-2">${m.name}</td>
+                                    <td>${m.category}</td>
+                                    <td>${m.quantity_in_stock}</td>
+                                    <td>${m.expiry_date}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                alert('Error loading medicines: ' + error.message);
+            }
+        }
+
+        async function uploadPrescription() {
+            const fileInput = document.getElementById('prescription-file');
+            if (!fileInput.files[0]) {
+                alert('Please select a file');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch(`${API_URL}/uploads/prescription`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                const data = await response.json();
+                alert('File uploaded successfully!');
+                window.open(`${API_URL.replace('/api', '')}${data.path}`, '_blank');
+            } catch (error) {
+                alert('Upload failed: ' + error.message);
+            }
+        }
+
+        async function generateReport(type) {
+            try {
+                const medicines = await fetch(`${API_URL}/medicines`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                }).then(r => r.json());
+
+                let reportData = [];
+                if (type === 'expired') {
+                    reportData = medicines.filter(m => new Date(m.expiry_date) < new Date());
+                } else if (type === 'low-stock') {
+                    reportData = medicines.filter(m => m.quantity_in_stock <= 10);
+                } else {
+                    reportData = medicines;
+                }
+
+                document.getElementById('report-output').innerHTML = `
+                    <h3 class="font-bold mb-2">${type.toUpperCase()} Report</h3>
+                    <table class="w-full border">
+                        <thead><tr class="bg-gray-100"><th class="p-2">Name</th><th>Stock</th><th>Expiry</th></tr></thead>
+                        <tbody>
+                            ${reportData.map(m => `
+                                <tr class="border-b">
+                                    <td class="p-2">${m.name}</td>
+                                    <td>${m.quantity_in_stock}</td>
+                                    <td>${m.expiry_date}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    <button onclick="downloadReport('${type}')" class="btn btn-primary mt-4">Download PDF</button>
+                `;
+            } catch (error) {
+                alert('Error generating report: ' + error.message);
+            }
+        }
+
+        function downloadReport(type) {
+            alert('PDF download feature - integrate with jsPDF library');
+        }
+
+        async function askAI() {
+            const input = document.getElementById('ai-input');
+            const query = input.value.trim();
+            if (!query) return;
+
+            const chatDiv = document.getElementById('chat-messages');
+            chatDiv.innerHTML += `<div class="mb-2"><strong>You:</strong> ${query}</div>`;
+            chatDiv.innerHTML += `<div class="mb-2 text-gray-500">AI is thinking...</div>`;
+
+            try {
+                const response = await fetch(`${API_URL}/ai/query`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ message: query })
+                });
+                
+                const data = await response.json();
+                
+                // Remove "thinking" message
+                const messages = chatDiv.querySelectorAll('div');
+                messages[messages.length - 1].remove();
+                
+                chatDiv.innerHTML += `<div class="mb-2 bg-blue-50 p-2 rounded"><strong>AI:</strong> ${data.response}</div>`;
+                chatDiv.scrollTop = chatDiv.scrollHeight;
+            } catch (error) {
+                chatDiv.innerHTML += `<div class="mb-2 text-red-600">Error: ${error.message}</div>`;
+            }
+
+            input.value = '';
+        }
+
+
+
+        // Auto-login for testing
+        if (!token) {
+            fetch(`${API_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: 'test@pharma.com', password: 'test123' })
+            }).then(r => r.json()).then(data => {
+                if (data.token) {
+                    token = data.token;
+                    localStorage.setItem('pharmaflow_token', token);
+                    loadDashboard();
+                }
+            });
+        } else {
+            loadDashboard();
+        }
+    </script>
+</body>
+</html>

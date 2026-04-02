@@ -1,0 +1,2848 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PharmaFlow - Pharmaceutical Management System</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Charts are rendered with pure CSS - no external chart library needed -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/lucide.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .glassmorphism {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+        }
+
+        .dark-glassmorphism {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .gradient-bg {
+            background: #0f172a;
+            background-image: radial-gradient(circle at 15% 50%, rgba(56, 189, 248, 0.08), transparent 25%), radial-gradient(circle at 85% 30%, rgba(99, 102, 241, 0.08), transparent 25%);
+        }
+
+        .light-gradient {
+            background: #f8fafc;
+            background-image: radial-gradient(circle at 15% 50%, rgba(56, 189, 248, 0.05), transparent 25%), radial-gradient(circle at 85% 30%, rgba(99, 102, 241, 0.05), transparent 25%);
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(-100%);
+            }
+
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        .hover-scale {
+            transition: transform 0.2s ease-in-out;
+        }
+
+        .hover-scale:hover {
+            transform: scale(1.02);
+        }
+
+        .chatbot-float {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- Error Boundary for Debugging ---
+        class ErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false, error: null, errorInfo: null };
+            }
+            static getDerivedStateFromError(error) {
+                return { hasError: true, error };
+            }
+            componentDidCatch(error, errorInfo) {
+                console.error("ErrorBoundary caught an error:", error, errorInfo);
+                this.setState({ errorInfo });
+            }
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div style={{ padding: '20px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '8px', margin: '20px' }}>
+                            <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>Something went wrong.</h2>
+                            <details style={{ whiteSpace: 'pre-wrap', marginTop: '10px' }}>
+                                <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>Click for Error Details</summary>
+                                <br />
+                                {this.state.error && this.state.error.toString()}
+                                <br />
+                                {this.state.errorInfo && this.state.errorInfo.componentStack}
+                            </details>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
+        // ------------------------------------
+
+        // Mock Data
+        const mockMedicines = [
+            { id: 1, name: 'Paracetamol 500mg', category: 'Pain Relief', quantity: 150, price: 25, currency: 'INR', expiryDate: '2024-12-15', batchNumber: 'PCM001', supplier: 'Cipla Ltd' },
+            { id: 2, name: 'Amoxicillin 250mg', category: 'Antibiotic', quantity: 75, price: 180, currency: 'INR', expiryDate: '2024-06-20', batchNumber: 'AMX002', supplier: 'Sun Pharma' },
+            { id: 3, name: 'Cetirizine 10mg', category: 'Antihistamine', quantity: 200, price: 45, currency: 'INR', expiryDate: '2025-03-10', batchNumber: 'CTZ003', supplier: 'Dr. Reddy\'s' },
+            { id: 4, name: 'Metformin 500mg', category: 'Diabetes', quantity: 5, price: 120, currency: 'INR', expiryDate: '2024-01-15', batchNumber: 'MET004', supplier: 'Lupin Ltd' }
+        ];
+
+        const mockPatients = [
+            { id: 1, name: 'Rajesh Kumar', age: 45, phone: '+91-9876543210', email: 'rajesh.kumar@email.com', address: 'Mumbai, Maharashtra', medicalHistory: 'Diabetes, Hypertension' },
+            { id: 2, name: 'Priya Sharma', age: 32, phone: '+91-8765432109', email: 'priya.sharma@email.com', address: 'Delhi, NCR', medicalHistory: 'Asthma' },
+            { id: 3, name: 'Amit Patel', age: 28, phone: '+91-7654321098', email: 'amit.patel@email.com', address: 'Ahmedabad, Gujarat', medicalHistory: 'None' }
+        ];
+
+        const mockSuppliers = [
+            { id: 1, name: 'Cipla Ltd', contact: '+91-22-2482-1234', email: 'orders@cipla.com', company: 'Cipla Limited', medicines: ['Paracetamol', 'Aspirin', 'Ibuprofen'] },
+            { id: 2, name: 'Sun Pharma', contact: '+91-22-4324-4324', email: 'supply@sunpharma.com', company: 'Sun Pharmaceutical Industries Ltd', medicines: ['Amoxicillin', 'Azithromycin'] },
+            { id: 3, name: 'Dr. Reddy\'s', contact: '+91-40-4900-2900', email: 'orders@drreddys.com', company: 'Dr. Reddy\'s Laboratories Ltd', medicines: ['Cetirizine', 'Loratadine'] }
+        ];
+
+        const currencies = [
+            { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+            { code: 'USD', symbol: '$', name: 'US Dollar' },
+            { code: 'EUR', symbol: '€', name: 'Euro' },
+            { code: 'GBP', symbol: '£', name: 'British Pound' },
+            { code: 'JPY', symbol: '¥', name: 'Japanese Yen' }
+        ];
+
+        // API Configuration & Wrapper
+        const API_BASE_URL = 'http://localhost:3001/api';
+        let authToken = localStorage.getItem('pharmaflow_token') || null;
+
+        const apiCall = async (endpoint, options = {}) => {
+            const headers = {
+                'Content-Type': 'application/json',
+                ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
+                ...options.headers
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'API request failed');
+                return data;
+            } catch (err) {
+                console.error("API Call Error:", err);
+                throw err;
+            }
+        };
+
+        const authAPI = {
+            register: async (email, password, name) => {
+                const data = await apiCall('/auth/register', {
+                    method: 'POST',
+                    body: JSON.stringify({ email, password, name, role: 'staff' })
+                });
+                authToken = data.token;
+                localStorage.setItem('pharmaflow_token', data.token);
+                return data;
+            },
+            login: async (email, password) => {
+                const data = await apiCall('/auth/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ email, password })
+                });
+                authToken = data.token;
+                localStorage.setItem('pharmaflow_token', data.token);
+                return data;
+            },
+            logout: () => {
+                authToken = null;
+                localStorage.removeItem('pharmaflow_token');
+            }
+        };
+
+        const medicinesAPI = {
+            getAll: () => apiCall('/medicines'),
+            getExpiring: () => apiCall('/medicines/expiring'),
+            getExpired: () => apiCall('/medicines/expired'),
+            getLowStock: () => apiCall('/medicines/low-stock'),
+        };
+
+        const patientsAPI = {
+            getAll: () => apiCall('/patients')
+        };
+
+        const suppliersAPI = {
+            getAll: () => apiCall('/suppliers')
+        };
+
+        const AuthPage = ({ onLogin, isSignUp, setIsSignUp }) => {
+            const [formData, setFormData] = useState({ email: '', password: '', name: '', rememberMe: false });
+            const [showPassword, setShowPassword] = useState(false);
+            const [errors, setErrors] = useState({});
+
+            const validateForm = () => {
+                const newErrors = {};
+                if (!formData.email) newErrors.email = 'Email is required';
+                if (!formData.password) newErrors.password = 'Password is required';
+                if (isSignUp && !formData.name) newErrors.name = 'Name is required';
+                setErrors(newErrors);
+                return Object.keys(newErrors).length === 0;
+            };
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (validateForm()) {
+                    try {
+                        let res;
+                        if (isSignUp) {
+                            res = await authAPI.register(formData.email, formData.password, formData.name);
+                        } else {
+                            res = await authAPI.login(formData.email, formData.password);
+                        }
+                        onLogin(res.user);
+                    } catch (error) {
+                        setErrors({ global: error.message || 'Authentication failed' });
+                    }
+                }
+            };
+
+            return (
+                <div className="flex min-h-screen bg-gray-900 overflow-hidden font-sans">
+                    {/* Left Panel: Glowing Crystal Glassmorphism */}
+                    <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-center items-center p-12 overflow-hidden">
+                        {/* Abstract animated background elements */}
+                        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-500/30 rounded-full blur-[120px] mix-blend-screen animate-blob"></div>
+                        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-indigo-500/20 rounded-full blur-[120px] mix-blend-screen animate-blob animation-delay-2000"></div>
+                        <div className="absolute top-[40%] right-[20%] w-[40%] h-[40%] bg-cyan-400/20 rounded-full blur-[100px] mix-blend-screen animate-blob animation-delay-4000"></div>
+
+                        <div className="relative z-10 max-w-lg w-full backdrop-blur-3xl bg-white/5 border border-white/10 p-10 rounded-3xl shadow-[0_0_40px_rgba(59,130,246,0.15)] overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent opacity-50"></div>
+                            <div className="absolute inset-0 border-[0.5px] border-white/20 rounded-3xl [mask-image:linear-gradient(to_bottom_right,white,transparent)]"></div>
+
+                            <div className="relative z-20 flex items-center space-x-4 mb-10">
+                                <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-indigo-600 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(59,130,246,0.5)]">
+                                    <i data-lucide="pill" className="w-8 h-8 text-white"></i>
+                                </div>
+                                <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-100 to-indigo-200 tracking-tight">MEDIMETRICS</h1>
+                            </div>
+
+                            <div className="relative z-20 space-y-6">
+                                <h2 className="text-5xl font-extrabold text-white leading-tight">
+                                    Intelligent <br />
+                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300 drop-shadow-sm">Pharmacy</span> <br />
+                                    Management.
+                                </h2>
+                                <p className="text-lg text-blue-100/70 font-light leading-relaxed">
+                                    Unify your inventory, track patients effortlessly, and predict stock shortages with our next-generation neural nervous system architecture.
+                                </p>
+
+                                <div className="pt-8 flex space-x-6">
+                                    <div className="flex flex-col">
+                                        <span className="text-3xl font-bold text-white">99%</span>
+                                        <span className="text-sm font-medium text-blue-200/60 uppercase tracking-wider">Uptime</span>
+                                    </div>
+                                    <div className="h-12 w-px bg-white/20"></div>
+                                    <div className="flex flex-col">
+                                        <span className="text-3xl font-bold text-white">10x</span>
+                                        <span className="text-sm font-medium text-blue-200/60 uppercase tracking-wider">Faster Docs</span>
+                                    </div>
+                                    <div className="h-12 w-px bg-white/20"></div>
+                                    <div className="flex flex-col">
+                                        <span className="text-3xl font-bold text-white">Zero</span>
+                                        <span className="text-sm font-medium text-blue-200/60 uppercase tracking-wider">Stockouts</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Panel: Form Area */}
+                    <div className="w-full lg:w-1/2 flex flex-col justify-center items-center bg-white px-6 py-12 lg:px-20 z-10 shadow-[-20px_0_50px_-20px_rgba(0,0,0,0.5)] relative">
+                        {/* Mobile Logo */}
+                        <div className="flex lg:hidden items-center justify-center mb-10 w-full animate-fade-in">
+                            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg mr-3">
+                                <i data-lucide="pill" className="w-6 h-6 text-white"></i>
+                            </div>
+                            <h1 className="text-3xl font-bold text-gray-900">MEDIMETRICS</h1>
+                        </div>
+
+                        <div className="max-w-md w-full animate-fade-in">
+                            <div className="mb-10 text-center lg:text-left">
+                                <h2 className="text-3xl font-bold text-gray-900 mb-3 tracking-tight">{isSignUp ? 'Create your account' : 'Welcome back'}</h2>
+                                <p className="text-gray-500 font-medium">{isSignUp ? 'Sign up to modernize your pharma business today.' : 'Please enter your details to access your dashboard.'}</p>
+                                {errors.global && (
+                                    <div className="mt-4 p-4 rounded-xl bg-red-50 border border-red-100 flex items-start space-x-3 animate-slide-in">
+                                        <i data-lucide="alert-circle" className="w-5 h-5 text-red-500 shrink-0 mt-0.5"></i>
+                                        <p className="text-sm text-red-600 font-medium text-left">{errors.global}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <form onSubmit={handleSubmit} className="space-y-5">
+                                {isSignUp && (
+                                    <div className="animate-slide-in">
+                                        <label htmlFor="name" className="block text-sm font-semibold text-gray-700 mb-1.5">Full Name</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                                <i data-lucide="user" className="h-5 w-5 text-gray-400"></i>
+                                            </div>
+                                            <input
+                                                id="name"
+                                                type="text"
+                                                value={formData.name}
+                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all bg-gray-50 focus:bg-white sm:text-sm font-medium text-gray-900"
+                                                placeholder="Dr. John Doe"
+                                            />
+                                        </div>
+                                        {errors.name && <p className="text-red-500 text-xs font-semibold mt-1.5 pl-1">{errors.name}</p>}
+                                    </div>
+                                )}
+
+                                <div>
+                                    <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-1.5">Email Address</label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                            <i data-lucide="mail" className="h-5 w-5 text-gray-400"></i>
+                                        </div>
+                                        <input
+                                            id="email"
+                                            type="email"
+                                            value={formData.email}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                            className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all bg-gray-50 focus:bg-white sm:text-sm font-medium text-gray-900"
+                                            placeholder="you@hospital.com"
+                                        />
+                                    </div>
+                                    {errors.email && <p className="text-red-500 text-xs font-semibold mt-1.5 pl-1">{errors.email}</p>}
+                                </div>
+
+                                <div>
+                                    <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                            <i data-lucide="lock" className="h-5 w-5 text-gray-400"></i>
+                                        </div>
+                                        <input
+                                            id="password"
+                                            type={showPassword ? 'text' : 'password'}
+                                            value={formData.password}
+                                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                            className="w-full pl-11 pr-12 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all bg-gray-50 focus:bg-white sm:text-sm font-medium text-gray-900"
+                                            placeholder="••••••••"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                                        >
+                                            <i data-lucide={showPassword ? 'eye-off' : 'eye'} className="h-5 w-5"></i>
+                                        </button>
+                                    </div>
+                                    {errors.password && <p className="text-red-500 text-xs font-semibold mt-1.5 pl-1">{errors.password}</p>}
+                                </div>
+
+                                {!isSignUp && (
+                                    <div className="flex items-center justify-between pt-1">
+                                        <label className="flex items-center group cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.rememberMe}
+                                                onChange={(e) => setFormData({ ...formData, rememberMe: e.target.checked })}
+                                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500/50 cursor-pointer"
+                                            />
+                                            <span className="ml-2.5 text-sm font-medium text-gray-600 group-hover:text-gray-900 transition-colors">Remember me for 30 days</span>
+                                        </label>
+                                        <a href="#" className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors">Forgot password?</a>
+                                    </div>
+                                )}
+
+                                <div className="pt-2">
+                                    <button
+                                        type="submit"
+                                        className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3.5 px-4 rounded-xl focus:ring-4 focus:ring-blue-500/30 transition-all font-semibold shadow-lg shadow-blue-600/20 active:scale-[0.98]"
+                                    >
+                                        <span>{isSignUp ? 'Create new account' : 'Sign in to dashboard'}</span>
+                                        <i data-lucide="arrow-right" className="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                            </form>
+
+                            <div className="mt-10 pt-8 border-t border-gray-100 text-center">
+                                <p className="text-sm font-medium text-gray-600">
+                                    {isSignUp ? 'Already have an account?' : "New to PharmaFlow?"}
+                                    <button
+                                        onClick={() => { setIsSignUp(!isSignUp); setErrors({}); }}
+                                        className="ml-2 text-blue-600 hover:text-blue-800 font-bold transition-colors"
+                                    >
+                                        {isSignUp ? 'Sign in instead' : 'Create an account'}
+                                    </button>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Dashboard Component
+        const Dashboard = ({ darkMode, setDarkMode, currentPage, setCurrentPage, setIsAuthenticated }) => {
+            const [sidebarOpen, setSidebarOpen] = useState(true);
+            const [chatbotOpen, setChatbotOpen] = useState(false);
+            const [medicines, setMedicines] = useState([]);
+            const [patients, setPatients] = useState([]);
+            const [suppliers, setSuppliers] = useState([]);
+            const [isLoading, setIsLoading] = useState(true);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [searchResults, setSearchResults] = useState([]);
+            const [showSearchResults, setShowSearchResults] = useState(false);
+            const [showNotifications, setShowNotifications] = useState(false);
+
+            useEffect(() => {
+                const loadData = async () => {
+                    try {
+                        const [medsData, patsData, suppsData] = await Promise.all([
+                            medicinesAPI.getAll(),
+                            patientsAPI.getAll(),
+                            suppliersAPI.getAll()
+                        ]);
+                        setMedicines(medsData);
+                        setPatients(patsData);
+                        setSuppliers(suppsData);
+                    } catch (error) {
+                        console.error('Failed to fetch data from backend, falling back to mock data', error);
+                        setMedicines(mockMedicines);
+                        setPatients(mockPatients);
+                        setSuppliers(mockSuppliers);
+                    } finally {
+                        setIsLoading(false);
+                    }
+                };
+                loadData();
+            }, []);
+
+            const menuItems = [
+                { id: 'dashboard', name: 'Dashboard', icon: 'layout-dashboard' },
+                { id: 'inventory', name: 'Inventory Management', icon: 'pill' },
+                { id: 'expired', name: 'Expired Medicines', icon: 'clock' },
+                { id: 'patients', name: 'Patients', icon: 'users' },
+                { id: 'prescriptions', name: 'Prescriptions', icon: 'file-text' },
+                { id: 'suppliers', name: 'Suppliers', icon: 'truck' },
+                { id: 'settings', name: 'Settings', icon: 'settings' }
+            ];
+
+            const getExpiredMedicines = () => {
+                const today = new Date();
+                return medicines.filter(med => {
+                    const expiryDate = new Date(med.expiryDate);
+                    const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                    return daysUntilExpiry <= 30;
+                });
+            };
+
+            const getLowStockMedicines = () => {
+                return medicines.filter(med => med.quantity <= 10);
+            };
+
+            // Calculate notification counts
+            const today = new Date();
+            const expiredCount = medicines.filter(med => new Date(med.expiryDate) <= today).length;
+            const nearExpiryCount = medicines.filter(med => {
+                const expiryDate = new Date(med.expiryDate);
+                const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                return daysUntilExpiry > 0 && daysUntilExpiry <= 30;
+            }).length;
+            const lowStockCount = medicines.filter(med => med.quantity <= 10).length;
+
+            // Search functionality
+            useEffect(() => {
+                if (searchTerm.trim()) {
+                    const results = [];
+
+                    // Search medicines
+                    medicines.forEach(med => {
+                        if (med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            med.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            med.supplier.toLowerCase().includes(searchTerm.toLowerCase())) {
+                            results.push({
+                                type: 'medicine',
+                                id: med.id,
+                                title: med.name,
+                                subtitle: `${med.category} • Qty: ${med.quantity}`,
+                                icon: 'pill',
+                                action: () => setCurrentPage('inventory')
+                            });
+                        }
+                    });
+
+                    // Search patients
+                    patients.forEach(patient => {
+                        if (patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            patient.phone.includes(searchTerm) ||
+                            patient.email.toLowerCase().includes(searchTerm.toLowerCase())) {
+                            results.push({
+                                type: 'patient',
+                                id: patient.id,
+                                title: patient.name,
+                                subtitle: `Age: ${patient.age} • ${patient.phone}`,
+                                icon: 'user',
+                                action: () => setCurrentPage('patients')
+                            });
+                        }
+                    });
+
+                    // Search suppliers
+                    suppliers.forEach(supplier => {
+                        if (supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            supplier.company.toLowerCase().includes(searchTerm.toLowerCase())) {
+                            results.push({
+                                type: 'supplier',
+                                id: supplier.id,
+                                title: supplier.name,
+                                subtitle: supplier.company,
+                                icon: 'truck',
+                                action: () => setCurrentPage('suppliers')
+                            });
+                        }
+                    });
+
+                    // Add general suggestions
+                    if (searchTerm.toLowerCase().includes('prescription')) {
+                        results.push({
+                            type: 'action',
+                            id: 'prescription',
+                            title: 'Create Prescription',
+                            subtitle: 'Create a new prescription for patients',
+                            icon: 'file-text',
+                            action: () => setCurrentPage('prescriptions')
+                        });
+                    }
+
+                    if (searchTerm.toLowerCase().includes('expired')) {
+                        results.push({
+                            type: 'action',
+                            id: 'expired',
+                            title: 'View Expired Medicines',
+                            subtitle: 'Check medicines that have expired',
+                            icon: 'clock',
+                            action: () => setCurrentPage('expired')
+                        });
+                    }
+
+                    setSearchResults(results.slice(0, 8)); // Limit to 8 results
+                    setShowSearchResults(true);
+                } else {
+                    setSearchResults([]);
+                    setShowSearchResults(false);
+                }
+            }, [searchTerm, medicines, patients, suppliers]);
+
+            useEffect(() => {
+                lucide.createIcons();
+            }, [currentPage, darkMode]);
+
+            const renderContent = () => {
+                switch (currentPage) {
+                    case 'dashboard':
+                        return <DashboardHome medicines={medicines} patients={patients} suppliers={suppliers} darkMode={darkMode} setCurrentPage={setCurrentPage} />;
+                    case 'inventory':
+                        return <InventoryManagement medicines={medicines} setMedicines={setMedicines} darkMode={darkMode} searchTerm={searchTerm} />;
+                    case 'expired':
+                        return <ExpiredMedicines medicines={getExpiredMedicines()} darkMode={darkMode} />;
+                    case 'patients':
+                        return <PatientManagement patients={patients} setPatients={setPatients} darkMode={darkMode} searchTerm={searchTerm} />;
+                    case 'prescriptions':
+                        return <PrescriptionManagement patients={patients} medicines={medicines} darkMode={darkMode} />;
+                    case 'suppliers':
+                        return <SupplierManagement suppliers={suppliers} setSuppliers={setSuppliers} darkMode={darkMode} searchTerm={searchTerm} />;
+                    case 'settings':
+                        return <Settings darkMode={darkMode} setDarkMode={setDarkMode} />;
+                    default:
+                        return <DashboardHome medicines={medicines} patients={patients} suppliers={suppliers} darkMode={darkMode} setCurrentPage={setCurrentPage} />;
+                }
+            };
+
+            return (
+                <div className={`min-h-screen ${darkMode ? 'gradient-bg text-white' : 'light-gradient text-gray-900'} transition-all duration-300`}>
+                    {/* Sidebar */}
+                    <div
+                        onMouseEnter={() => setSidebarOpen(true)}
+                        onMouseLeave={() => setSidebarOpen(false)}
+                        className={`fixed left-0 top-0 h-full ${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} border-r-0 transform transition-all duration-300 z-40 flex flex-col overflow-hidden shadow-2xl ${sidebarOpen ? 'w-64 translate-x-0' : 'w-20 translate-x-0'}`}
+                        style={{ borderRight: darkMode ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.05)' }}
+                    >
+                        <div className={`p-4 mt-2 flex items-center h-16 transition-all duration-300 ${sidebarOpen ? 'justify-start px-6' : 'justify-center'}`}>
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/30">
+                                <i data-lucide="pill" className="w-6 h-6 text-white" style={{ strokeWidth: 2 }}></i>
+                            </div>
+                            <h1 className={`text-2xl font-bold ml-4 whitespace-nowrap transition-all duration-300 tracking-tight ${sidebarOpen ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4 hidden'}`}>
+                                PharmaFlow
+                            </h1>
+                        </div>
+                        <nav className="flex-1 px-4 space-y-2 mt-8">
+                            {menuItems.map(item => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => setCurrentPage(item.id)}
+                                    className={`w-full flex items-center h-12 rounded-xl transition-all relative group/nav overflow-hidden ${currentPage === item.id
+                                        ? (darkMode ? 'bg-blue-600/20 text-blue-400 font-semibold' : 'bg-blue-50 text-blue-600 font-semibold')
+                                        : (darkMode ? 'text-gray-400 hover:bg-white/5 hover:text-white' : 'text-gray-500 hover:bg-black/5 hover:text-gray-900')
+                                        } ${sidebarOpen ? 'px-4' : 'px-0 justify-center'}`}
+                                    title={!sidebarOpen ? item.name : ''}
+                                >
+                                    <div className={`flex items-center justify-center shrink-0 ${sidebarOpen ? '' : 'w-12 h-12'}`}>
+                                        <i data-lucide={item.icon} className={`w-5 h-5 transition-transform group-hover/nav:scale-110 ${currentPage === item.id ? 'stroke-[2.5px]' : 'stroke-2'}`}></i>
+                                    </div>
+                                    <span className={`whitespace-nowrap ml-3 transition-opacity duration-300 ${sidebarOpen ? 'opacity-100 block' : 'opacity-0 hidden'}`}>
+                                        {item.name}
+                                    </span>
+                                </button>
+                            ))}
+                        </nav>
+
+                        <div className={`p-4 mt-auto mb-4 transition-all duration-300 ${sidebarOpen ? 'px-4' : 'px-2'}`}>
+                            <div className={`flex items-center p-2 rounded-xl ${darkMode ? 'hover:bg-white/5' : 'hover:bg-black/5'} transition-colors cursor-pointer ${sidebarOpen ? 'justify-start' : 'justify-center'}`}>
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 rounded-full flex items-center justify-center shrink-0 border border-blue-200 dark:border-blue-700">
+                                    <span className="text-blue-700 dark:text-blue-300 font-bold text-sm">A</span>
+                                </div>
+                                <div className={`ml-3 overflow-hidden transition-all duration-300 ${sidebarOpen ? 'opacity-100 w-auto' : 'opacity-0 w-0 hidden'}`}>
+                                    <p className="text-sm font-semibold truncate leading-tight">Admin User</p>
+                                    <p className="text-xs text-blue-500 dark:text-blue-400 truncate">admin@pharmaflow</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="transition-all duration-300 pl-20 w-full min-h-screen flex flex-col">
+                        {/* Top Navigation */}
+                        <header className={`${darkMode ? 'dark-glassmorphism border-white/5' : 'glassmorphism border-black/5'} border-b px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm`}>
+                            <div className="flex items-center space-x-4">
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="Search medicines, patients, suppliers..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        onFocus={() => setShowSearchResults(searchTerm.trim() !== '')}
+                                        onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
+                                        className={`pl-10 pr-4 py-2 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white placeholder-blue-200' : 'bg-white/50 text-gray-900 placeholder-gray-500'} focus:ring-2 focus:ring-blue-500 transition-all w-80`}
+                                    />
+                                    <i data-lucide="search" className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"></i>
+
+                                    {/* Search Results Dropdown */}
+                                    {showSearchResults && searchResults.length > 0 && (
+                                        <div className={`absolute top-full left-0 right-0 mt-2 ${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto`}>
+                                            <div className="p-2">
+                                                <p className={`text-xs font-medium ${darkMode ? 'text-blue-200' : 'text-gray-600'} px-3 py-2`}>
+                                                    Search Results ({searchResults.length})
+                                                </p>
+                                                {searchResults.map((result) => (
+                                                    <button
+                                                        key={`${result.type}-${result.id}`}
+                                                        onClick={() => {
+                                                            result.action();
+                                                            setShowSearchResults(false);
+                                                            setSearchTerm('');
+                                                        }}
+                                                        className={`w-full flex items-center space-x-3 px-3 py-3 rounded-lg hover:bg-white/10 transition-colors text-left`}
+                                                    >
+                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${result.type === 'medicine' ? 'bg-blue-100' :
+                                                            result.type === 'patient' ? 'bg-green-100' :
+                                                                result.type === 'supplier' ? 'bg-purple-100' :
+                                                                    'bg-orange-100'
+                                                            }`}>
+                                                            <i data-lucide={result.icon} className={`w-4 h-4 ${result.type === 'medicine' ? 'text-blue-600' :
+                                                                result.type === 'patient' ? 'text-green-600' :
+                                                                    result.type === 'supplier' ? 'text-purple-600' :
+                                                                        'text-orange-600'
+                                                                }`}></i>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="font-medium text-sm truncate">{result.title}</p>
+                                                            <p className={`text-xs ${darkMode ? 'text-blue-200' : 'text-gray-600'} truncate`}>
+                                                                {result.subtitle}
+                                                            </p>
+                                                        </div>
+                                                        <span className={`px-2 py-1 rounded-full text-xs ${result.type === 'medicine' ? 'bg-blue-100 text-blue-800' :
+                                                            result.type === 'patient' ? 'bg-green-100 text-green-800' :
+                                                                result.type === 'supplier' ? 'bg-purple-100 text-purple-800' :
+                                                                    'bg-orange-100 text-orange-800'
+                                                            }`}>
+                                                            {result.type}
+                                                        </span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* No Results */}
+                                    {showSearchResults && searchResults.length === 0 && searchTerm.trim() && (
+                                        <div className={`absolute top-full left-0 right-0 mt-2 ${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} rounded-lg shadow-xl z-50`}>
+                                            <div className="p-4 text-center">
+                                                <i data-lucide="search-x" className="w-8 h-8 mx-auto mb-2 text-gray-400"></i>
+                                                <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>
+                                                    No results found for "{searchTerm}"
+                                                </p>
+                                                <p className={`text-xs ${darkMode ? 'text-blue-300' : 'text-gray-500'} mt-1`}>
+                                                    Try searching for medicines, patients, or suppliers
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                                <button
+                                    onClick={() => setDarkMode(!darkMode)}
+                                    className="p-2 rounded-lg hover:bg-white/20 transition-colors"
+                                    title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                                >
+                                    <i data-lucide={darkMode ? 'sun' : 'moon'} className="w-6 h-6"></i>
+                                </button>
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setShowNotifications(!showNotifications)}
+                                        className="p-2 rounded-lg hover:bg-white/20 transition-colors relative"
+                                    >
+                                        <i data-lucide="bell" className="w-6 h-6"></i>
+                                        {(expiredCount + nearExpiryCount + lowStockCount) > 0 && (
+                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                                {expiredCount + nearExpiryCount + lowStockCount}
+                                            </span>
+                                        )}
+                                    </button>
+
+                                    {/* Notifications Dropdown */}
+                                    {showNotifications && (
+                                        <div className={`absolute top-full right-0 mt-2 w-80 ${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto`}>
+                                            <div className="p-4 border-b border-white/10">
+                                                <h3 className="font-semibold">Notifications</h3>
+                                                <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>
+                                                    {expiredCount + nearExpiryCount + lowStockCount} alerts
+                                                </p>
+                                            </div>
+                                            <div className="p-2 space-y-2">
+                                                {expiredCount > 0 && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setCurrentPage('expired');
+                                                            setShowNotifications(false);
+                                                        }}
+                                                        className="w-full p-3 rounded-lg bg-red-100/20 border border-red-200/30 hover:bg-red-100/30 transition-colors text-left"
+                                                    >
+                                                        <div className="flex items-center space-x-3">
+                                                            <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                                                                <i data-lucide="alert-circle" className="w-4 h-4 text-red-600"></i>
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <p className="font-medium text-sm text-red-600">Expired Medicines</p>
+                                                                <p className="text-xs text-red-500">{expiredCount} medicines have expired</p>
+                                                            </div>
+                                                        </div>
+                                                    </button>
+                                                )}
+
+                                                {nearExpiryCount > 0 && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setCurrentPage('expired');
+                                                            setShowNotifications(false);
+                                                        }}
+                                                        className="w-full p-3 rounded-lg bg-yellow-100/20 border border-yellow-200/30 hover:bg-yellow-100/30 transition-colors text-left"
+                                                    >
+                                                        <div className="flex items-center space-x-3">
+                                                            <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                                                                <i data-lucide="clock" className="w-4 h-4 text-yellow-600"></i>
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <p className="font-medium text-sm text-yellow-600">Near Expiry</p>
+                                                                <p className="text-xs text-yellow-500">{nearExpiryCount} medicines expiring within 30 days</p>
+                                                            </div>
+                                                        </div>
+                                                    </button>
+                                                )}
+
+                                                {lowStockCount > 0 && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setCurrentPage('inventory');
+                                                            setShowNotifications(false);
+                                                        }}
+                                                        className="w-full p-3 rounded-lg bg-orange-100/20 border border-orange-200/30 hover:bg-orange-100/30 transition-colors text-left"
+                                                    >
+                                                        <div className="flex items-center space-x-3">
+                                                            <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                                                                <i data-lucide="alert-triangle" className="w-4 h-4 text-orange-600"></i>
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <p className="font-medium text-sm text-orange-600">Low Stock Alert</p>
+                                                                <p className="text-xs text-orange-500">{lowStockCount} items are running low</p>
+                                                            </div>
+                                                        </div>
+                                                    </button>
+                                                )}
+
+                                                {(expiredCount + nearExpiryCount + lowStockCount) === 0 && (
+                                                    <div className="p-4 text-center">
+                                                        <i data-lucide="check-circle" className="w-8 h-8 mx-auto mb-2 text-green-500"></i>
+                                                        <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>
+                                                            No notifications
+                                                        </p>
+                                                        <p className={`text-xs ${darkMode ? 'text-blue-300' : 'text-gray-500'} mt-1`}>
+                                                            All systems are running smoothly
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={() => setIsAuthenticated(false)}
+                                    className="p-2 rounded-lg hover:bg-white/20 transition-colors"
+                                    title="Logout"
+                                >
+                                    <i data-lucide="log-out" className="w-6 h-6"></i>
+                                </button>
+                                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                                    <span className="text-white font-medium">A</span>
+                                </div>
+                            </div>
+                        </header>
+
+                        {/* Page Content */}
+                        <main className="p-6 animate-fade-in">
+                            {renderContent()}
+                        </main>
+                    </div>
+
+                    {/* Chatbot */}
+                    <div className="fixed bottom-6 right-6 z-50">
+                        <button
+                            onClick={() => setChatbotOpen(!chatbotOpen)}
+                            className={`w-14 h-14 rounded-full ${darkMode ? 'bg-blue-600' : 'bg-blue-500'} text-white shadow-lg hover:shadow-xl transition-all chatbot-float`}
+                        >
+                            <i data-lucide="message-circle" className="w-6 h-6 mx-auto"></i>
+                        </button>
+
+                        {chatbotOpen && (
+                            <div className={`absolute bottom-16 right-0 w-80 h-96 ${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} rounded-2xl shadow-xl animate-slide-in`}>
+                                <Chatbot darkMode={darkMode} medicines={medicines} patients={patients} />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // Dashboard Home Component
+        const DashboardHome = ({ medicines, patients, suppliers, darkMode, setCurrentPage }) => {
+            const expiredCount = medicines.filter(med => new Date(med.expiryDate) <= new Date()).length;
+            const lowStockCount = medicines.filter(med => med.quantity <= 10).length;
+            const totalRevenue = medicines.reduce((sum, med) => sum + (med.price * med.quantity), 0);
+            const nearExpiryCount = medicines.filter(med => {
+                const expiryDate = new Date(med.expiryDate);
+                const today = new Date();
+                const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                return daysUntilExpiry > 0 && daysUntilExpiry <= 30;
+            }).length;
+
+            const stats = [
+                { title: 'Total Medicines', value: medicines.length, icon: 'pill', color: 'blue', trend: '+12%', trendUp: true },
+                { title: 'Total Revenue', value: `₹${totalRevenue.toLocaleString()}`, icon: 'trending-up', color: 'green', trend: '+8.2%', trendUp: true },
+                { title: 'Total Patients', value: patients.length, icon: 'users', color: 'purple', trend: '+5.1%', trendUp: true },
+                { title: 'Low Stock Alert', value: lowStockCount, icon: 'alert-triangle', color: 'red', trend: '-2.3%', trendUp: false }
+            ];
+
+            const quickActions = [
+                { title: 'Add Medicine', icon: 'plus-circle', color: 'blue', action: 'inventory' },
+                { title: 'New Patient', icon: 'user-plus', color: 'green', action: 'patients' },
+                { title: 'Create Prescription', icon: 'file-plus', color: 'purple', action: 'prescriptions' },
+                { title: 'View Reports', icon: 'bar-chart-3', color: 'orange', action: 'expired' }
+            ];
+
+            // --- Chart Data Preparation (Pure CSS Charts) ---
+            // 1. Inventory Value by Category Data
+            const categoryDataMap = medicines.reduce((acc, med) => {
+                const cat = med.category || 'Uncategorized';
+                acc[cat] = (acc[cat] || 0) + (med.price * med.quantity);
+                return acc;
+            }, {});
+            const categoryData = Object.keys(categoryDataMap).map(cat => ({
+                name: cat,
+                value: categoryDataMap[cat]
+            })).sort((a, b) => b.value - a.value).slice(0, 5);
+            const maxCategoryValue = Math.max(...categoryData.map(d => d.value), 1);
+
+            // 2. Medicine Expiry Timeline Data (Gantt style)
+            const expiryData = [...medicines]
+                .filter(med => new Date(med.expiryDate) > new Date())
+                .sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate))
+                .slice(0, 6)
+                .map(med => {
+                    const expiry = new Date(med.expiryDate);
+                    const today = new Date();
+                    const daysRemaining = Math.max(0, Math.ceil((expiry - today) / (1000 * 60 * 60 * 24)));
+                    return {
+                        name: med.name.length > 15 ? med.name.substring(0, 15) + '...' : med.name,
+                        days: daysRemaining,
+                        fullDate: new Date(med.expiryDate).toLocaleDateString('en-IN')
+                    };
+                });
+            const maxExpiryDays = Math.max(...expiryData.map(d => d.days), 1);
+
+            const chartColors = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe'];
+            const getExpiryColor = (days) => {
+                if (days <= 30) return '#ef4444';
+                if (days <= 90) return '#f59e0b';
+                if (days <= 180) return '#3b82f6';
+                return '#22c55e';
+            };
+            // -----------------------------
+
+            return (
+                <div className="space-y-8">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-4xl font-bold mb-2">Welcome to PharmaFlow</h1>
+                            <p className={`text-lg ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>
+                                Here's what's happening with your pharmacy today.
+                            </p>
+                        </div>
+                        <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} p-4 rounded-2xl`}>
+                            <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>Today's Date</p>
+                            <p className="text-xl font-bold">{new Date().toLocaleDateString('en-IN')}</p>
+                        </div>
+                    </div>
+
+                    {/* Enhanced Stats Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {stats.map((stat, index) => (
+                            <div key={index} className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} p-6 rounded-2xl hover-scale relative overflow-hidden group cursor-pointer border ${darkMode ? 'border-white/5 hover:border-white/20' : 'border-black/5 hover:border-black/10'} transition-all duration-300 shadow-sm hover:shadow-xl`}>
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                <div className="flex items-center justify-between mb-4 relative z-10">
+                                    <div className={`p-3 rounded-xl bg-gradient-to-br from-${stat.color}-100 to-${stat.color}-200 dark:from-${stat.color}-900/50 dark:to-${stat.color}-800/50 shadow-inner`}>
+                                        <i data-lucide={stat.icon} className={`w-6 h-6 text-${stat.color}-600 dark:text-${stat.color}-400`}></i>
+                                    </div>
+                                    <div className={`flex items-center space-x-1 font-semibold text-sm px-2 py-1 rounded-full ${stat.trendUp ? 'bg-green-100/50 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100/50 text-red-600 dark:bg-red-900/30 dark:text-red-400'}`}>
+                                        <i data-lucide={stat.trendUp ? 'trending-up' : 'trending-down'} className="w-4 h-4"></i>
+                                        <span>{stat.trend}</span>
+                                    </div>
+                                </div>
+                                <div className="relative z-10">
+                                    <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>{stat.title}</p>
+                                    <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} tracking-tight`}>{stat.value}</p>
+                                </div>
+                                <div className={`absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-${stat.color}-400 to-${stat.color}-600 opacity-50 group-hover:opacity-100 transition-opacity`}></div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className={`${darkMode ? 'dark-glassmorphism border-white/5' : 'glassmorphism border-black/5'} p-6 rounded-2xl border shadow-sm`}>
+                        <h3 className={`text-xl font-semibold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Quick Actions</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {quickActions.map((action, index) => (
+                                <button
+                                    key={index}
+                                    onClick={() => setCurrentPage(action.action)}
+                                    className={`p-6 rounded-xl border border-dashed ${darkMode ? 'border-gray-700 hover:border-blue-400 hover:bg-blue-900/20' : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'} transition-all duration-300 group flex flex-col items-center justify-center`}
+                                >
+                                    <div className={`w-14 h-14 mb-4 rounded-full bg-gradient-to-br from-${action.color}-100 to-${action.color}-200 dark:from-${action.color}-900/40 dark:to-${action.color}-800/40 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm group-hover:shadow-md`}>
+                                        <i data-lucide={action.icon} className={`w-6 h-6 text-${action.color}-600 dark:text-${action.color}-400`}></i>
+                                    </div>
+                                    <p className={`font-medium text-sm ${darkMode ? 'text-gray-300 group-hover:text-blue-300' : 'text-gray-700 group-hover:text-blue-700'} transition-colors`}>{action.title}</p>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Real-time Charts Section - Pure CSS */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+                        {/* Bar Chart: Inventory Value by Category */}
+                        <div className={`${darkMode ? 'dark-glassmorphism border-white/5' : 'glassmorphism border-black/5'} p-6 rounded-2xl border shadow-sm`}>
+                            <h3 className={`text-xl font-semibold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'} flex items-center`}>
+                                <i data-lucide="pie-chart" className="w-5 h-5 mr-2 text-indigo-500"></i>
+                                Top Categories Value
+                            </h3>
+                            <div className="space-y-4">
+                                {categoryData.length > 0 ? categoryData.map((item, idx) => (
+                                    <div key={idx} className="group">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{item.name}</span>
+                                            <span className={`text-sm font-bold ${darkMode ? 'text-indigo-300' : 'text-indigo-600'}`}>₹{item.value.toLocaleString()}</span>
+                                        </div>
+                                        <div className={`w-full h-8 rounded-lg overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                                            <div
+                                                className="h-full rounded-lg transition-all duration-1000 ease-out group-hover:opacity-80"
+                                                style={{
+                                                    width: `${(item.value / maxCategoryValue) * 100}%`,
+                                                    background: `linear-gradient(90deg, ${chartColors[idx] || '#6366f1'}, ${chartColors[Math.min(idx + 1, chartColors.length - 1)]})`
+                                                }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="h-48 flex items-center justify-center text-gray-500">No category data available</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Horizontal Bar Chart: Gantt/Expiry Timeline */}
+                        <div className={`${darkMode ? 'dark-glassmorphism border-white/5' : 'glassmorphism border-black/5'} p-6 rounded-2xl border shadow-sm`}>
+                            <h3 className={`text-xl font-semibold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'} flex items-center`}>
+                                <i data-lucide="bar-chart-2" className="w-5 h-5 mr-2 text-rose-500"></i>
+                                Medicine Expiry Timeline
+                            </h3>
+                            <div className="space-y-3">
+                                {expiryData.length > 0 ? expiryData.map((item, idx) => (
+                                    <div key={idx} className="group relative">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} w-32 truncate`} title={item.name}>{item.name}</span>
+                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full`} style={{ backgroundColor: getExpiryColor(item.days) + '20', color: getExpiryColor(item.days) }}>
+                                                {item.days} days — {item.fullDate}
+                                            </span>
+                                        </div>
+                                        <div className={`w-full h-6 rounded-md overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                                            <div
+                                                className="h-full rounded-md transition-all duration-1000 ease-out group-hover:brightness-110 flex items-center justify-end pr-2"
+                                                style={{
+                                                    width: `${Math.max((item.days / maxExpiryDays) * 100, 8)}%`,
+                                                    backgroundColor: getExpiryColor(item.days)
+                                                }}
+                                            >
+                                                <span className="text-white text-xs font-bold drop-shadow">{item.days}d</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="h-48 flex items-center justify-center text-gray-500">No expiry data available</div>
+                                )}
+                                {expiryData.length > 0 && (
+                                    <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t border-white/10">
+                                        <span className="flex items-center gap-1.5 text-xs"><span className="w-3 h-3 rounded-full bg-red-500"></span> {'<'}30 days</span>
+                                        <span className="flex items-center gap-1.5 text-xs"><span className="w-3 h-3 rounded-full bg-yellow-500"></span> 30-90 days</span>
+                                        <span className="flex items-center gap-1.5 text-xs"><span className="w-3 h-3 rounded-full bg-blue-500"></span> 90-180 days</span>
+                                        <span className="flex items-center gap-1.5 text-xs"><span className="w-3 h-3 rounded-full bg-green-500"></span> 180+ days</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Enhanced Activity Sections */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+                        {/* Recent Medicines */}
+                        <div className={`${darkMode ? 'dark-glassmorphism border-white/5' : 'glassmorphism border-black/5'} p-6 rounded-2xl border shadow-sm flex flex-col`}>
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Recent Medicines</h3>
+                                <div className="p-2 rounded-lg bg-blue-100/50 dark:bg-blue-900/30">
+                                    <i data-lucide="pill" className="w-5 h-5 text-blue-600 dark:text-blue-400"></i>
+                                </div>
+                            </div>
+                            <div className="space-y-3 flex-1">
+                                {medicines.slice(0, 4).map(med => (
+                                    <div key={med.id} className={`flex items-center justify-between p-3 rounded-xl border border-transparent ${darkMode ? 'hover:bg-white/5 hover:border-white/10' : 'hover:bg-black/5 hover:border-black/5'} transition-all duration-300 group`}>
+                                        <div className="flex items-center space-x-3">
+                                            <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/50 dark:to-indigo-900/50 rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform duration-300">
+                                                <i data-lucide="pill" className="w-5 h-5 text-blue-600 dark:text-blue-400"></i>
+                                            </div>
+                                            <div>
+                                                <p className={`font-medium text-sm ${darkMode ? 'text-gray-200 group-hover:text-white' : 'text-gray-800 group-hover:text-gray-900'} transition-colors`}>{med.name}</p>
+                                                <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mt-0.5`}>Qty: <span className="font-medium">{med.quantity}</span></p>
+                                            </div>
+                                        </div>
+                                        <span className={`px-2.5 py-1 rounded-md text-xs font-medium border ${med.quantity <= 10 ? 'bg-red-50 text-red-600 border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30' : 'bg-green-50 text-green-600 border-green-100 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/30'}`}>
+                                            {med.quantity <= 10 ? 'Low' : 'OK'}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                            <button onClick={() => setCurrentPage('inventory')} className={`mt-4 w-full py-2.5 rounded-xl text-sm font-medium ${darkMode ? 'bg-white/5 hover:bg-white/10 text-gray-300' : 'bg-gray-50 hover:bg-gray-100 text-gray-600'} transition-colors`}>
+                                View All Medicines
+                            </button>
+                        </div>
+
+                        {/* Recent Patients */}
+                        <div className={`${darkMode ? 'dark-glassmorphism border-white/5' : 'glassmorphism border-black/5'} p-6 rounded-2xl border shadow-sm flex flex-col`}>
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Recent Patients</h3>
+                                <div className="p-2 rounded-lg bg-green-100/50 dark:bg-green-900/30">
+                                    <i data-lucide="users" className="w-5 h-5 text-green-600 dark:text-green-400"></i>
+                                </div>
+                            </div>
+                            <div className="space-y-3 flex-1">
+                                {patients.slice(0, 4).map(patient => (
+                                    <div key={patient.id} className={`flex items-center space-x-3 p-3 rounded-xl border border-transparent ${darkMode ? 'hover:bg-white/5 hover:border-white/10' : 'hover:bg-black/5 hover:border-black/5'} transition-all duration-300 group`}>
+                                        <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform duration-300">
+                                            <span className="text-white font-bold text-sm shadow-sm">{patient.name.charAt(0)}</span>
+                                        </div>
+                                        <div>
+                                            <p className={`font-medium text-sm ${darkMode ? 'text-gray-200 group-hover:text-white' : 'text-gray-800 group-hover:text-gray-900'} transition-colors`}>{patient.name}</p>
+                                            <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mt-0.5`}>Age: <span className="font-medium">{patient.age}</span></p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <button onClick={() => setCurrentPage('patients')} className={`mt-4 w-full py-2.5 rounded-xl text-sm font-medium ${darkMode ? 'bg-white/5 hover:bg-white/10 text-gray-300' : 'bg-gray-50 hover:bg-gray-100 text-gray-600'} transition-colors`}>
+                                View All Patients
+                            </button>
+                        </div>
+
+                        {/* Alerts & Notifications */}
+                        <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} p-6 rounded-2xl`}>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-xl font-semibold">Alerts</h3>
+                                <i data-lucide="bell" className="w-5 h-5 text-red-500"></i>
+                            </div>
+                            <div className="space-y-3">
+                                {expiredCount > 0 && (
+                                    <button
+                                        onClick={() => setCurrentPage('expired')}
+                                        className="w-full p-3 rounded-lg bg-red-100/20 border border-red-200/30 hover:bg-red-100/30 transition-colors text-left"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center space-x-2">
+                                                <i data-lucide="alert-circle" className="w-4 h-4 text-red-500"></i>
+                                                <p className="text-sm font-medium text-red-600">{expiredCount} Expired Medicines</p>
+                                            </div>
+                                            <i data-lucide="chevron-right" className="w-4 h-4 text-red-500"></i>
+                                        </div>
+                                        <p className="text-xs text-red-500 mt-1 ml-6">Click to view expired medicines</p>
+                                    </button>
+                                )}
+                                {nearExpiryCount > 0 && (
+                                    <button
+                                        onClick={() => setCurrentPage('expired')}
+                                        className="w-full p-3 rounded-lg bg-yellow-100/20 border border-yellow-200/30 hover:bg-yellow-100/30 transition-colors text-left"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center space-x-2">
+                                                <i data-lucide="clock" className="w-4 h-4 text-yellow-500"></i>
+                                                <p className="text-sm font-medium text-yellow-600">{nearExpiryCount} Near Expiry</p>
+                                            </div>
+                                            <i data-lucide="chevron-right" className="w-4 h-4 text-yellow-500"></i>
+                                        </div>
+                                        <p className="text-xs text-yellow-500 mt-1 ml-6">Medicines expiring within 30 days</p>
+                                    </button>
+                                )}
+                                {lowStockCount > 0 && (
+                                    <button
+                                        onClick={() => setCurrentPage('inventory')}
+                                        className="w-full p-3 rounded-lg bg-orange-100/20 border border-orange-200/30 hover:bg-orange-100/30 transition-colors text-left"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center space-x-2">
+                                                <i data-lucide="alert-triangle" className="w-4 h-4 text-orange-500"></i>
+                                                <p className="text-sm font-medium text-orange-600">{lowStockCount} Low Stock Items</p>
+                                            </div>
+                                            <i data-lucide="chevron-right" className="w-4 h-4 text-orange-500"></i>
+                                        </div>
+                                        <p className="text-xs text-orange-500 mt-1 ml-6">Items with quantity ≤ 10</p>
+                                    </button>
+                                )}
+                                {expiredCount === 0 && nearExpiryCount === 0 && lowStockCount === 0 && (
+                                    <div className="p-3 rounded-lg bg-green-100/20 border border-green-200/30">
+                                        <div className="flex items-center space-x-2">
+                                            <i data-lucide="check-circle" className="w-4 h-4 text-green-500"></i>
+                                            <p className="text-sm font-medium text-green-600">All systems normal</p>
+                                        </div>
+                                        <p className="text-xs text-green-500 mt-1 ml-6">No alerts at this time</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Inventory Management Component
+        const InventoryManagement = ({ medicines, setMedicines, darkMode, searchTerm }) => {
+            const [showAddForm, setShowAddForm] = useState(false);
+            const [editingMedicine, setEditingMedicine] = useState(null);
+            const [sortBy, setSortBy] = useState('name');
+            const [filterBy, setFilterBy] = useState('all');
+
+            const filteredMedicines = medicines.filter(med =>
+                med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                med.category.toLowerCase().includes(searchTerm.toLowerCase())
+            ).filter(med => {
+                if (filterBy === 'expired') return new Date(med.expiryDate) <= new Date();
+                if (filterBy === 'low-stock') return med.quantity <= 10;
+                return true;
+            }).sort((a, b) => {
+                if (sortBy === 'name') return a.name.localeCompare(b.name);
+                if (sortBy === 'quantity') return b.quantity - a.quantity;
+                if (sortBy === 'expiry') return new Date(a.expiryDate) - new Date(b.expiryDate);
+                return 0;
+            });
+
+            const handleAddMedicine = (medicineData) => {
+                const newMedicine = {
+                    id: Date.now(),
+                    ...medicineData
+                };
+                setMedicines([...medicines, newMedicine]);
+                setShowAddForm(false);
+            };
+
+            const handleEditMedicine = (medicineData) => {
+                setMedicines(medicines.map(med =>
+                    med.id === editingMedicine.id ? { ...editingMedicine, ...medicineData } : med
+                ));
+                setEditingMedicine(null);
+            };
+
+            const handleDeleteMedicine = (id) => {
+                setMedicines(medicines.filter(med => med.id !== id));
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-3xl font-bold">Inventory Management</h1>
+                        <button
+                            onClick={() => setShowAddForm(true)}
+                            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                        >
+                            <i data-lucide="plus" className="w-5 h-5"></i>
+                            <span>Add Medicine</span>
+                        </button>
+                    </div>
+
+                    {/* Filters */}
+                    <div className="flex flex-wrap gap-4">
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className={`px-4 py-2 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                        >
+                            <option value="name">Sort by Name</option>
+                            <option value="quantity">Sort by Quantity</option>
+                            <option value="expiry">Sort by Expiry</option>
+                        </select>
+                        <select
+                            value={filterBy}
+                            onChange={(e) => setFilterBy(e.target.value)}
+                            className={`px-4 py-2 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                        >
+                            <option value="all">All Medicines</option>
+                            <option value="expired">Expired</option>
+                            <option value="low-stock">Low Stock</option>
+                        </select>
+                    </div>
+
+                    {/* Medicines Table */}
+                    <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} rounded-2xl overflow-hidden`}>
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className={`${darkMode ? 'bg-blue-900/50' : 'bg-white/50'}`}>
+                                    <tr>
+                                        <th className="px-6 py-4 text-left font-semibold">Medicine Name</th>
+                                        <th className="px-6 py-4 text-left font-semibold">Category</th>
+                                        <th className="px-6 py-4 text-left font-semibold">Quantity</th>
+                                        <th className="px-6 py-4 text-left font-semibold">Price</th>
+                                        <th className="px-6 py-4 text-left font-semibold">Expiry Date</th>
+                                        <th className="px-6 py-4 text-left font-semibold">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredMedicines.map(medicine => (
+                                        <tr key={medicine.id} className="border-t border-white/10">
+                                            <td className="px-6 py-4">
+                                                <div>
+                                                    <p className="font-medium">{medicine.name}</p>
+                                                    <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>Batch: {medicine.batchNumber}</p>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">{medicine.category}</td>
+                                            <td className="px-6 py-4">
+                                                <span className={`px-2 py-1 rounded-full text-sm ${medicine.quantity <= 10 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                                                    {medicine.quantity}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {currencies.find(c => c.code === medicine.currency)?.symbol}{medicine.price}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`${new Date(medicine.expiryDate) <= new Date() ? 'text-red-500' : ''}`}>
+                                                    {medicine.expiryDate}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex space-x-2">
+                                                    <button
+                                                        onClick={() => setEditingMedicine(medicine)}
+                                                        className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                                    >
+                                                        <i data-lucide="edit" className="w-4 h-4"></i>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteMedicine(medicine.id)}
+                                                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                                                    >
+                                                        <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Add/Edit Medicine Modal */}
+                    {(showAddForm || editingMedicine) && (
+                        <MedicineForm
+                            medicine={editingMedicine}
+                            onSubmit={editingMedicine ? handleEditMedicine : handleAddMedicine}
+                            onCancel={() => {
+                                setShowAddForm(false);
+                                setEditingMedicine(null);
+                            }}
+                            darkMode={darkMode}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        // Medicine Form Component
+        const MedicineForm = ({ medicine, onSubmit, onCancel, darkMode }) => {
+            const [formData, setFormData] = useState({
+                name: medicine?.name || '',
+                category: medicine?.category || '',
+                quantity: medicine?.quantity || '',
+                price: medicine?.price || '',
+                currency: medicine?.currency || 'INR',
+                expiryDate: medicine?.expiryDate || '',
+                batchNumber: medicine?.batchNumber || '',
+                supplier: medicine?.supplier || ''
+            });
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSubmit(formData);
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} rounded-2xl p-6 w-full max-w-md animate-fade-in`}>
+                        <h2 className="text-2xl font-bold mb-6">{medicine ? 'Edit Medicine' : 'Add New Medicine'}</h2>
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label htmlFor="medicineName" className="block text-sm font-medium mb-2">Medicine Name</label>
+                                <input
+                                    id="medicineName"
+                                    type="text"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="category" className="block text-sm font-medium mb-2">Category</label>
+                                <input
+                                    id="category"
+                                    type="text"
+                                    value={formData.category}
+                                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    required
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="quantity" className="block text-sm font-medium mb-2">Quantity</label>
+                                    <input
+                                        id="quantity"
+                                        type="number"
+                                        value={formData.quantity}
+                                        onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })}
+                                        className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="price" className="block text-sm font-medium mb-2">Price</label>
+                                    <div className="flex">
+                                        <select
+                                            value={formData.currency}
+                                            onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                                            className={`px-3 py-3 rounded-l-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                        >
+                                            {currencies.map(curr => (
+                                                <option key={curr.code} value={curr.code}>{curr.code}</option>
+                                            ))}
+                                        </select>
+                                        <input
+                                            id="price"
+                                            type="number"
+                                            value={formData.price}
+                                            onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+                                            className={`flex-1 px-4 py-3 rounded-r-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label htmlFor="expiryDate" className="block text-sm font-medium mb-2">Expiry Date</label>
+                                <input
+                                    id="expiryDate"
+                                    type="date"
+                                    value={formData.expiryDate}
+                                    onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="batchNumber" className="block text-sm font-medium mb-2">Batch Number</label>
+                                <input
+                                    id="batchNumber"
+                                    type="text"
+                                    value={formData.batchNumber}
+                                    onChange={(e) => setFormData({ ...formData, batchNumber: e.target.value })}
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="supplier" className="block text-sm font-medium mb-2">Supplier</label>
+                                <input
+                                    id="supplier"
+                                    type="text"
+                                    value={formData.supplier}
+                                    onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    required
+                                />
+                            </div>
+
+                            <div className="flex space-x-4 pt-4">
+                                <button
+                                    type="submit"
+                                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    {medicine ? 'Update Medicine' : 'Add Medicine'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onCancel}
+                                    className="flex-1 bg-gray-500 text-white py-3 rounded-lg hover:bg-gray-600 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        // Expired Medicines Component
+        const ExpiredMedicines = ({ medicines, darkMode }) => {
+            const today = new Date();
+            const expiredMedicines = medicines.filter(med => new Date(med.expiryDate) <= today);
+            const nearExpiryMedicines = medicines.filter(med => {
+                const expiryDate = new Date(med.expiryDate);
+                const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                return daysUntilExpiry > 0 && daysUntilExpiry <= 30;
+            });
+
+            const generateReport = () => {
+                const reportData = {
+                    expired: expiredMedicines,
+                    nearExpiry: nearExpiryMedicines,
+                    generatedAt: new Date().toISOString()
+                };
+
+                const dataStr = JSON.stringify(reportData, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'expired-medicines-report.json';
+                link.click();
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-3xl font-bold">Expired Medicines</h1>
+                        <button
+                            onClick={generateReport}
+                            className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+                        >
+                            <i data-lucide="download" className="w-5 h-5"></i>
+                            <span>Generate Report</span>
+                        </button>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} p-6 rounded-2xl`}>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>Expired</p>
+                                    <p className="text-3xl font-bold text-red-500">{expiredMedicines.length}</p>
+                                </div>
+                                <i data-lucide="alert-circle" className="w-8 h-8 text-red-500"></i>
+                            </div>
+                        </div>
+                        <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} p-6 rounded-2xl`}>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>Near Expiry (30 days)</p>
+                                    <p className="text-3xl font-bold text-yellow-500">{nearExpiryMedicines.length}</p>
+                                </div>
+                                <i data-lucide="clock" className="w-8 h-8 text-yellow-500"></i>
+                            </div>
+                        </div>
+                        <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} p-6 rounded-2xl`}>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>Total Value Lost</p>
+                                    <p className="text-3xl font-bold text-red-500">
+                                        ₹{expiredMedicines.reduce((sum, med) => sum + (med.price * med.quantity), 0).toLocaleString()}
+                                    </p>
+                                </div>
+                                <i data-lucide="trending-down" className="w-8 h-8 text-red-500"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Expired Medicines Table */}
+                    <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} rounded-2xl overflow-hidden`}>
+                        <div className="p-6 border-b border-white/10">
+                            <h3 className="text-xl font-semibold text-red-500">Expired Medicines</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className={`${darkMode ? 'bg-red-900/20' : 'bg-red-50'}`}>
+                                    <tr>
+                                        <th className="px-6 py-4 text-left font-semibold">Medicine Name</th>
+                                        <th className="px-6 py-4 text-left font-semibold">Batch Number</th>
+                                        <th className="px-6 py-4 text-left font-semibold">Quantity</th>
+                                        <th className="px-6 py-4 text-left font-semibold">Expired Date</th>
+                                        <th className="px-6 py-4 text-left font-semibold">Value Lost</th>
+                                        <th className="px-6 py-4 text-left font-semibold">Supplier</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {expiredMedicines.map(medicine => (
+                                        <tr key={medicine.id} className="border-t border-white/10">
+                                            <td className="px-6 py-4 font-medium">{medicine.name}</td>
+                                            <td className="px-6 py-4">{medicine.batchNumber}</td>
+                                            <td className="px-6 py-4">{medicine.quantity}</td>
+                                            <td className="px-6 py-4 text-red-500">{medicine.expiryDate}</td>
+                                            <td className="px-6 py-4 text-red-500">
+                                                {currencies.find(c => c.code === medicine.currency)?.symbol}{(medicine.price * medicine.quantity).toLocaleString()}
+                                            </td>
+                                            <td className="px-6 py-4">{medicine.supplier}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Near Expiry Medicines */}
+                    <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} rounded-2xl overflow-hidden`}>
+                        <div className="p-6 border-b border-white/10">
+                            <h3 className="text-xl font-semibold text-yellow-500">Near Expiry (Next 30 Days)</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className={`${darkMode ? 'bg-yellow-900/20' : 'bg-yellow-50'}`}>
+                                    <tr>
+                                        <th className="px-6 py-4 text-left font-semibold">Medicine Name</th>
+                                        <th className="px-6 py-4 text-left font-semibold">Batch Number</th>
+                                        <th className="px-6 py-4 text-left font-semibold">Quantity</th>
+                                        <th className="px-6 py-4 text-left font-semibold">Expiry Date</th>
+                                        <th className="px-6 py-4 text-left font-semibold">Days Left</th>
+                                        <th className="px-6 py-4 text-left font-semibold">Supplier</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {nearExpiryMedicines.map(medicine => {
+                                        const daysLeft = Math.ceil((new Date(medicine.expiryDate) - today) / (1000 * 60 * 60 * 24));
+                                        return (
+                                            <tr key={medicine.id} className="border-t border-white/10">
+                                                <td className="px-6 py-4 font-medium">{medicine.name}</td>
+                                                <td className="px-6 py-4">{medicine.batchNumber}</td>
+                                                <td className="px-6 py-4">{medicine.quantity}</td>
+                                                <td className="px-6 py-4 text-yellow-500">{medicine.expiryDate}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-1 rounded-full text-sm ${daysLeft <= 7 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                                        {daysLeft} days
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">{medicine.supplier}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Patient Management Component
+        const PatientManagement = ({ patients, setPatients, darkMode, searchTerm }) => {
+            const [showAddForm, setShowAddForm] = useState(false);
+            const [editingPatient, setEditingPatient] = useState(null);
+
+            const filteredPatients = patients.filter(patient =>
+                patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                patient.phone.includes(searchTerm) ||
+                patient.email.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            const handleAddPatient = (patientData) => {
+                const newPatient = {
+                    id: Date.now(),
+                    ...patientData
+                };
+                setPatients([...patients, newPatient]);
+                setShowAddForm(false);
+            };
+
+            const handleEditPatient = (patientData) => {
+                setPatients(patients.map(patient =>
+                    patient.id === editingPatient.id ? { ...editingPatient, ...patientData } : patient
+                ));
+                setEditingPatient(null);
+            };
+
+            const handleDeletePatient = (id) => {
+                setPatients(patients.filter(patient => patient.id !== id));
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-3xl font-bold">Patient Management</h1>
+                        <button
+                            onClick={() => setShowAddForm(true)}
+                            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                        >
+                            <i data-lucide="user-plus" className="w-5 h-5"></i>
+                            <span>Add Patient</span>
+                        </button>
+                    </div>
+
+                    {/* Patients Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredPatients.map(patient => (
+                            <div key={patient.id} className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} p-6 rounded-2xl hover-scale`}>
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
+                                            <span className="text-white font-bold text-lg">{patient.name.charAt(0)}</span>
+                                        </div>
+                                        <div>
+                                            <h3 className="font-semibold text-lg">{patient.name}</h3>
+                                            <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>Age: {patient.age}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex space-x-2">
+                                        <button
+                                            onClick={() => setEditingPatient(patient)}
+                                            className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                        >
+                                            <i data-lucide="edit" className="w-4 h-4"></i>
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeletePatient(patient.id)}
+                                            className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                                        >
+                                            <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex items-center space-x-2">
+                                        <i data-lucide="phone" className="w-4 h-4 text-gray-500"></i>
+                                        <span className="text-sm">{patient.phone}</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <i data-lucide="mail" className="w-4 h-4 text-gray-500"></i>
+                                        <span className="text-sm">{patient.email}</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <i data-lucide="map-pin" className="w-4 h-4 text-gray-500"></i>
+                                        <span className="text-sm">{patient.address}</span>
+                                    </div>
+                                    <div className="mt-3">
+                                        <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>Medical History:</p>
+                                        <p className="text-sm font-medium">{patient.medicalHistory}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Add/Edit Patient Modal */}
+                    {(showAddForm || editingPatient) && (
+                        <PatientForm
+                            patient={editingPatient}
+                            onSubmit={editingPatient ? handleEditPatient : handleAddPatient}
+                            onCancel={() => {
+                                setShowAddForm(false);
+                                setEditingPatient(null);
+                            }}
+                            darkMode={darkMode}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        // Patient Form Component
+        const PatientForm = ({ patient, onSubmit, onCancel, darkMode }) => {
+            const [formData, setFormData] = useState({
+                name: patient?.name || '',
+                age: patient?.age || '',
+                phone: patient?.phone || '',
+                email: patient?.email || '',
+                address: patient?.address || '',
+                medicalHistory: patient?.medicalHistory || ''
+            });
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSubmit(formData);
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} rounded-2xl p-6 w-full max-w-md animate-fade-in`}>
+                        <h2 className="text-2xl font-bold mb-6">{patient ? 'Edit Patient' : 'Add New Patient'}</h2>
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label htmlFor="patientName" className="block text-sm font-medium mb-2">Full Name</label>
+                                <input
+                                    id="patientName"
+                                    type="text"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    required
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="age" className="block text-sm font-medium mb-2">Age</label>
+                                    <input
+                                        id="age"
+                                        type="number"
+                                        value={formData.age}
+                                        onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value) })}
+                                        className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="phone" className="block text-sm font-medium mb-2">Phone</label>
+                                    <input
+                                        id="phone"
+                                        type="tel"
+                                        value={formData.phone}
+                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                        className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label htmlFor="email" className="block text-sm font-medium mb-2">Email</label>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="address" className="block text-sm font-medium mb-2">Address</label>
+                                <textarea
+                                    id="address"
+                                    value={formData.address}
+                                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    rows="3"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="medicalHistory" className="block text-sm font-medium mb-2">Medical History</label>
+                                <textarea
+                                    id="medicalHistory"
+                                    value={formData.medicalHistory}
+                                    onChange={(e) => setFormData({ ...formData, medicalHistory: e.target.value })}
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    rows="3"
+                                    placeholder="Enter medical conditions, allergies, etc."
+                                />
+                            </div>
+
+                            <div className="flex space-x-4 pt-4">
+                                <button
+                                    type="submit"
+                                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    {patient ? 'Update Patient' : 'Add Patient'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onCancel}
+                                    className="flex-1 bg-gray-500 text-white py-3 rounded-lg hover:bg-gray-600 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        // Prescription Management Component
+        const PrescriptionManagement = ({ patients, medicines, darkMode }) => {
+            const [prescriptions, setPrescriptions] = useState([]);
+            const [showAddForm, setShowAddForm] = useState(false);
+
+            const handleAddPrescription = (prescriptionData) => {
+                const newPrescription = {
+                    id: Date.now(),
+                    ...prescriptionData,
+                    date: new Date().toISOString().split('T')[0]
+                };
+                setPrescriptions([...prescriptions, newPrescription]);
+                setShowAddForm(false);
+            };
+
+            const printPrescription = (prescription) => {
+                const printWindow = window.open('', '_blank');
+                const patient = patients.find(p => p.id === prescription.patientId);
+
+                printWindow.document.write(`
+                    <html>
+                        <head>
+                            <title>Prescription - ${patient?.name}</title>
+                            <style>
+                                body { font-family: Arial, sans-serif; padding: 20px; }
+                                .header { text-align: center; margin-bottom: 30px; }
+                                .patient-info { margin-bottom: 20px; }
+                                .medicines { margin-top: 20px; }
+                                table { width: 100%; border-collapse: collapse; }
+                                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                                th { background-color: #f2f2f2; }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="header">
+                                <h1>PharmaFlow</h1>
+                                <h2>Medical Prescription</h2>
+                            </div>
+                            <div class="patient-info">
+                                <p><strong>Patient:</strong> ${patient?.name}</p>
+                                <p><strong>Age:</strong> ${patient?.age}</p>
+                                <p><strong>Date:</strong> ${prescription.date}</p>
+                                <p><strong>Doctor:</strong> ${prescription.doctor}</p>
+                            </div>
+                            <div class="medicines">
+                                <h3>Prescribed Medicines:</h3>
+                                <table>
+                                    <tr>
+                                        <th>Medicine</th>
+                                        <th>Dosage</th>
+                                        <th>Frequency</th>
+                                        <th>Duration</th>
+                                    </tr>
+                                    ${prescription.medicines.map(med => `
+                                        <tr>
+                                            <td>${med.name}</td>
+                                            <td>${med.dosage}</td>
+                                            <td>${med.frequency}</td>
+                                            <td>${med.duration}</td>
+                                        </tr>
+                                    `).join('')}
+                                </table>
+                            </div>
+                            <div style="margin-top: 30px;">
+                                <p><strong>Notes:</strong> ${prescription.notes || 'None'}</p>
+                            </div>
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.print();
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-3xl font-bold">Prescription Management</h1>
+                        <button
+                            onClick={() => setShowAddForm(true)}
+                            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                        >
+                            <i data-lucide="file-plus" className="w-5 h-5"></i>
+                            <span>New Prescription</span>
+                        </button>
+                    </div>
+
+                    {/* Prescriptions List */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {prescriptions.map(prescription => {
+                            const patient = patients.find(p => p.id === prescription.patientId);
+                            const displayName = prescription.patientName || patient?.name || 'Unknown Patient';
+                            return (
+                                <div key={prescription.id} className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} p-6 rounded-2xl hover-scale`}>
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div>
+                                            <h3 className="text-lg font-semibold">{displayName}</h3>
+                                            <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>
+                                                Dr. {prescription.doctor} • {prescription.date}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => printPrescription(prescription)}
+                                            className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                        >
+                                            <i data-lucide="printer" className="w-5 h-5"></i>
+                                        </button>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <h4 className="font-medium">Prescribed Medicines:</h4>
+                                        {prescription.medicines.map((med, index) => (
+                                            <div key={index} className="bg-white/10 p-3 rounded-lg">
+                                                <p className="font-medium">{med.name}</p>
+                                                <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>
+                                                    {med.dosage} • {med.frequency} • {med.duration}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {prescription.notes && (
+                                        <div className="mt-4">
+                                            <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>Notes:</p>
+                                            <p className="text-sm">{prescription.notes}</p>
+                                        </div>
+                                    )}
+
+                                    {prescription.pdfData && (
+                                        <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
+                                            <div className="flex items-center space-x-2 text-sm text-blue-500">
+                                                <i data-lucide="file-text" className="w-5 h-5"></i>
+                                                <span className="truncate max-w-[150px] font-medium">{prescription.pdfName}</span>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    const newWindow = window.open();
+                                                    newWindow.document.write(`<iframe width="100%" height="100%" src="${prescription.pdfData}" frameborder="0"></iframe>`);
+                                                }}
+                                                className="px-3 py-1.5 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+                                            >
+                                                View Document
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {prescriptions.length === 0 && (
+                        <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} p-12 rounded-2xl text-center`}>
+                            <i data-lucide="file-text" className="w-16 h-16 mx-auto mb-4 text-gray-400"></i>
+                            <h3 className="text-xl font-semibold mb-2">No Prescriptions Yet</h3>
+                            <p className={`${darkMode ? 'text-blue-200' : 'text-gray-600'} mb-4`}>
+                                Start by creating your first prescription for a patient.
+                            </p>
+                            <button
+                                onClick={() => setShowAddForm(true)}
+                                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                Create Prescription
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Add Prescription Modal */}
+                    {showAddForm && (
+                        <PrescriptionForm
+                            patients={patients}
+                            medicines={medicines}
+                            onSubmit={handleAddPrescription}
+                            onCancel={() => setShowAddForm(false)}
+                            darkMode={darkMode}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        // Prescription Form Component
+        const PrescriptionForm = ({ patients, medicines, onSubmit, onCancel, darkMode }) => {
+            const [formData, setFormData] = useState({
+                patientName: '',
+                doctor: '',
+                medicines: [{ name: '', dosage: '', frequency: '', duration: '' }],
+                notes: '',
+                pdfName: '',
+                pdfData: ''
+            });
+
+            const handlePdfUpload = (file) => {
+                if (file && file.type === "application/pdf") {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setFormData(prev => ({ ...prev, pdfData: reader.result, pdfName: file.name }));
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    alert("Please upload a valid PDF file.");
+                }
+            };
+
+            const addMedicine = () => {
+                setFormData({
+                    ...formData,
+                    medicines: [...formData.medicines, { name: '', dosage: '', frequency: '', duration: '' }]
+                });
+            };
+
+            const removeMedicine = (index) => {
+                setFormData({
+                    ...formData,
+                    medicines: formData.medicines.filter((_, i) => i !== index)
+                });
+            };
+
+            const updateMedicine = (index, field, value) => {
+                const updatedMedicines = formData.medicines.map((med, i) =>
+                    i === index ? { ...med, [field]: value } : med
+                );
+                setFormData({ ...formData, medicines: updatedMedicines });
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSubmit(formData);
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} rounded-2xl p-6 w-full max-w-2xl animate-fade-in max-h-[90vh] overflow-y-auto`}>
+                        <h2 className="text-2xl font-bold mb-6">New Prescription</h2>
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="patientName" className="block text-sm font-medium mb-2">Patient Name</label>
+                                    <input
+                                        id="patientName"
+                                        type="text"
+                                        placeholder="Enter patient name"
+                                        value={formData.patientName}
+                                        onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
+                                        className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="doctor" className="block text-sm font-medium mb-2">Doctor Name</label>
+                                    <input
+                                        id="doctor"
+                                        type="text"
+                                        value={formData.doctor}
+                                        onChange={(e) => setFormData({ ...formData, doctor: e.target.value })}
+                                        className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="flex items-center justify-between mb-4">
+                                    <label className="block text-sm font-medium">Medicines</label>
+                                    <button
+                                        type="button"
+                                        onClick={addMedicine}
+                                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                                    >
+                                        <i data-lucide="plus" className="w-4 h-4"></i>
+                                        <span>Add Medicine</span>
+                                    </button>
+                                </div>
+
+                                {formData.medicines.map((medicine, index) => (
+                                    <div key={index} className="grid grid-cols-4 gap-2 mb-3 p-4 bg-white/10 rounded-lg">
+                                        <div>
+                                            <input
+                                                type="text"
+                                                placeholder="Medicine Name"
+                                                value={medicine.name}
+                                                onChange={(e) => updateMedicine(index, 'name', e.target.value)}
+                                                className={`w-full px-3 py-2 rounded border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                                required
+                                            />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="Dosage"
+                                            value={medicine.dosage}
+                                            onChange={(e) => updateMedicine(index, 'dosage', e.target.value)}
+                                            className={`px-3 py-2 rounded border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                            required
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Frequency"
+                                            value={medicine.frequency}
+                                            onChange={(e) => updateMedicine(index, 'frequency', e.target.value)}
+                                            className={`px-3 py-2 rounded border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                            required
+                                        />
+                                        <div className="flex space-x-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Duration"
+                                                value={medicine.duration}
+                                                onChange={(e) => updateMedicine(index, 'duration', e.target.value)}
+                                                className={`flex-1 px-3 py-2 rounded border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                                required
+                                            />
+                                            {formData.medicines.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeMedicine(index)}
+                                                    className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                                >
+                                                    <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div>
+                                <label htmlFor="notes" className="block text-sm font-medium mb-2">Notes</label>
+                                <textarea
+                                    id="notes"
+                                    value={formData.notes}
+                                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    rows="3"
+                                    placeholder="Additional instructions or notes..."
+                                />
+                            </div>
+
+                            {/* Drag & Drop PDF Upload for Prescription */}
+                            <div className="mt-4">
+                                <label className="block text-sm font-medium mb-2">Upload Prescription Document (PDF)</label>
+                                <div className={`border-2 border-dashed ${darkMode ? 'border-blue-500/30 hover:border-blue-400 bg-blue-900/20' : 'border-blue-200 hover:border-blue-400 bg-blue-50'} rounded-xl p-8 text-center transition-colors cursor-pointer flex flex-col items-center justify-center`}
+                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-blue-500', 'bg-blue-500/10'); }}
+                                    onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('border-blue-500', 'bg-blue-500/10'); }}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        e.currentTarget.classList.remove('border-blue-500', 'bg-blue-500/10');
+                                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                            handlePdfUpload(e.dataTransfer.files[0]);
+                                        }
+                                    }}
+                                    onClick={() => document.getElementById('prescription-upload').click()}
+                                >
+                                    {formData.pdfName ? (
+                                        <div className="flex flex-col items-center">
+                                            <i data-lucide="file-check-2" className="w-10 h-10 text-green-500 mb-3"></i>
+                                            <p className={`text-sm font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>{formData.pdfName} attached!</p>
+                                            <p className={`text-xs mt-1 ${darkMode ? 'text-blue-200/70' : 'text-gray-500'}`}>Click to replace</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <i data-lucide="upload-cloud" className="w-10 h-10 text-blue-500 mb-3"></i>
+                                            <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-700'}`}>Click or drag PDF file to upload</p>
+                                            <p className={`text-xs mt-1 ${darkMode ? 'text-blue-200/70' : 'text-gray-500'}`}>PDF up to 10MB</p>
+                                        </>
+                                    )}
+                                    <input type="file" id="prescription-upload" className="hidden" accept=".pdf" onChange={(e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                            handlePdfUpload(e.target.files[0]);
+                                        }
+                                    }} />
+                                </div>
+                            </div>
+
+                            <div className="flex space-x-4 pt-4">
+                                <button
+                                    type="submit"
+                                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    Create Prescription
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onCancel}
+                                    className="flex-1 bg-gray-500 text-white py-3 rounded-lg hover:bg-gray-600 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        // Supplier Management Component
+        const SupplierManagement = ({ suppliers, setSuppliers, darkMode, searchTerm }) => {
+            const [showAddForm, setShowAddForm] = useState(false);
+            const [editingSupplier, setEditingSupplier] = useState(null);
+
+            const filteredSuppliers = suppliers.filter(supplier =>
+                supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                supplier.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                supplier.contact.includes(searchTerm)
+            );
+
+            const handleAddSupplier = (supplierData) => {
+                const newSupplier = {
+                    id: Date.now(),
+                    ...supplierData
+                };
+                setSuppliers([...suppliers, newSupplier]);
+                setShowAddForm(false);
+            };
+
+            const handleEditSupplier = (supplierData) => {
+                setSuppliers(suppliers.map(supplier =>
+                    supplier.id === editingSupplier.id ? { ...editingSupplier, ...supplierData } : supplier
+                ));
+                setEditingSupplier(null);
+            };
+
+            const handleDeleteSupplier = (id) => {
+                setSuppliers(suppliers.filter(supplier => supplier.id !== id));
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-3xl font-bold">Supplier Management</h1>
+                        <button
+                            onClick={() => setShowAddForm(true)}
+                            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                        >
+                            <i data-lucide="truck" className="w-5 h-5"></i>
+                            <span>Add Supplier</span>
+                        </button>
+                    </div>
+
+                    {/* Suppliers Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredSuppliers.map(supplier => (
+                            <div key={supplier.id} className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} p-6 rounded-2xl hover-scale`}>
+                                <div className="flex items-start justify-between mb-4">
+                                    <div>
+                                        <h3 className="font-semibold text-lg">{supplier.name}</h3>
+                                        <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>{supplier.company}</p>
+                                    </div>
+                                    <div className="flex space-x-2">
+                                        <button
+                                            onClick={() => setEditingSupplier(supplier)}
+                                            className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                        >
+                                            <i data-lucide="edit" className="w-4 h-4"></i>
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteSupplier(supplier.id)}
+                                            className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                                        >
+                                            <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2 mb-4">
+                                    <div className="flex items-center space-x-2">
+                                        <i data-lucide="phone" className="w-4 h-4 text-gray-500"></i>
+                                        <span className="text-sm">{supplier.contact}</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <i data-lucide="mail" className="w-4 h-4 text-gray-500"></i>
+                                        <span className="text-sm">{supplier.email}</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p className={`text-sm font-medium mb-2 ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>Medicines Supplied:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                        {supplier.medicines.map((medicine, index) => (
+                                            <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                                                {medicine}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                                {supplier.pdfData && (
+                                    <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
+                                        <div className="flex items-center space-x-2 text-sm text-blue-500">
+                                            <i data-lucide="file-text" className="w-5 h-5"></i>
+                                            <span className="truncate max-w-[150px] font-medium">{supplier.pdfName}</span>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                const newWindow = window.open();
+                                                newWindow.document.write(`<iframe width="100%" height="100%" src="${supplier.pdfData}" frameborder="0"></iframe>`);
+                                            }}
+                                            className="px-3 py-1.5 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+                                        >
+                                            View PDF
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Add/Edit Supplier Modal */}
+                    {(showAddForm || editingSupplier) && (
+                        <SupplierForm
+                            supplier={editingSupplier}
+                            onSubmit={editingSupplier ? handleEditSupplier : handleAddSupplier}
+                            onCancel={() => {
+                                setShowAddForm(false);
+                                setEditingSupplier(null);
+                            }}
+                            darkMode={darkMode}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        // Supplier Form Component
+        const SupplierForm = ({ supplier, onSubmit, onCancel, darkMode }) => {
+            const [formData, setFormData] = useState({
+                name: supplier?.name || '',
+                company: supplier?.company || '',
+                contact: supplier?.contact || '',
+                email: supplier?.email || '',
+                medicines: supplier?.medicines || [],
+                pdfName: supplier?.pdfName || '',
+                pdfData: supplier?.pdfData || ''
+            });
+            const [newMedicine, setNewMedicine] = useState('');
+
+            const handlePdfUpload = (file) => {
+                if (file && file.type === "application/pdf") {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setFormData(prev => ({ ...prev, pdfData: reader.result, pdfName: file.name }));
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    alert("Please upload a valid PDF file.");
+                }
+            };
+
+            const addMedicine = () => {
+                if (newMedicine.trim()) {
+                    setFormData({
+                        ...formData,
+                        medicines: [...formData.medicines, newMedicine.trim()]
+                    });
+                    setNewMedicine('');
+                }
+            };
+
+            const removeMedicine = (index) => {
+                setFormData({
+                    ...formData,
+                    medicines: formData.medicines.filter((_, i) => i !== index)
+                });
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSubmit(formData);
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} rounded-2xl p-6 w-full max-w-md animate-fade-in`}>
+                        <h2 className="text-2xl font-bold mb-6">{supplier ? 'Edit Supplier' : 'Add New Supplier'}</h2>
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label htmlFor="supplierName" className="block text-sm font-medium mb-2">Contact Person Name</label>
+                                <input
+                                    id="supplierName"
+                                    type="text"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="company" className="block text-sm font-medium mb-2">Company Name</label>
+                                <input
+                                    id="company"
+                                    type="text"
+                                    value={formData.company}
+                                    onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="contact" className="block text-sm font-medium mb-2">Contact Number</label>
+                                <input
+                                    id="contact"
+                                    type="tel"
+                                    value={formData.contact}
+                                    onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="email" className="block text-sm font-medium mb-2">Email</label>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Medicines Supplied</label>
+                                <div className="flex space-x-2 mb-2">
+                                    <input
+                                        type="text"
+                                        value={newMedicine}
+                                        onChange={(e) => setNewMedicine(e.target.value)}
+                                        placeholder="Enter medicine name"
+                                        className={`flex-1 px-4 py-2 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={addMedicine}
+                                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                                    >
+                                        Add
+                                    </button>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {formData.medicines.map((medicine, index) => (
+                                        <span key={index} className="flex items-center space-x-1 px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                                            <span>{medicine}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeMedicine(index)}
+                                                className="text-blue-600 hover:text-blue-800"
+                                            >
+                                                <i data-lucide="x" className="w-3 h-3"></i>
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Drag & Drop PDF Upload for Supplier */}
+                            <div className="mt-4">
+                                <label className="block text-sm font-medium mb-2">Upload Supplier Agreement / Document (PDF)</label>
+                                <div className={`border-2 border-dashed ${darkMode ? 'border-blue-500/30 hover:border-blue-400 bg-blue-900/20' : 'border-blue-200 hover:border-blue-400 bg-blue-50'} rounded-xl p-8 text-center transition-colors cursor-pointer flex flex-col items-center justify-center`}
+                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-blue-500', 'bg-blue-500/10'); }}
+                                    onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('border-blue-500', 'bg-blue-500/10'); }}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        e.currentTarget.classList.remove('border-blue-500', 'bg-blue-500/10');
+                                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                            handlePdfUpload(e.dataTransfer.files[0]);
+                                        }
+                                    }}
+                                    onClick={() => document.getElementById('supplier-upload').click()}
+                                >
+                                    {formData.pdfName ? (
+                                        <div className="flex flex-col items-center">
+                                            <i data-lucide="file-check-2" className="w-10 h-10 text-green-500 mb-3"></i>
+                                            <p className={`text-sm font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>{formData.pdfName} attached!</p>
+                                            <p className={`text-xs mt-1 ${darkMode ? 'text-blue-200/70' : 'text-gray-500'}`}>Click to replace</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <i data-lucide="file-text" className="w-10 h-10 text-blue-500 mb-3"></i>
+                                            <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-700'}`}>Click or drag PDF file to upload</p>
+                                            <p className={`text-xs mt-1 ${darkMode ? 'text-blue-200/70' : 'text-gray-500'}`}>PDF up to 10MB</p>
+                                        </>
+                                    )}
+                                    <input type="file" id="supplier-upload" className="hidden" accept=".pdf" onChange={(e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                            handlePdfUpload(e.target.files[0]);
+                                        }
+                                    }} />
+                                </div>
+                            </div>
+
+                            <div className="flex space-x-4 pt-4">
+                                <button
+                                    type="submit"
+                                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    {supplier ? 'Update Supplier' : 'Add Supplier'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onCancel}
+                                    className="flex-1 bg-gray-500 text-white py-3 rounded-lg hover:bg-gray-600 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        // Settings Component
+        const Settings = ({ darkMode, setDarkMode }) => {
+            const [profile, setProfile] = useState({
+                name: 'Admin User',
+                email: 'admin@pharmacare.com',
+                phone: '+91-9876543210',
+                pharmacy: 'PharmaCare Medical Store'
+            });
+
+            const handleProfileUpdate = (e) => {
+                e.preventDefault();
+                // Profile update logic would go here
+                alert('Profile updated successfully!');
+            };
+
+            return (
+                <div className="space-y-6">
+                    <h1 className="text-3xl font-bold">Settings</h1>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Theme Settings */}
+                        <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} p-6 rounded-2xl`}>
+                            <h3 className="text-xl font-semibold mb-4">Appearance</h3>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="font-medium">Dark Mode</p>
+                                        <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-gray-600'}`}>
+                                            Switch between light and dark themes
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => setDarkMode(!darkMode)}
+                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${darkMode ? 'bg-blue-600' : 'bg-gray-200'
+                                            }`}
+                                    >
+                                        <span
+                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-1'
+                                                }`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Profile Settings */}
+                        <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} p-6 rounded-2xl`}>
+                            <h3 className="text-xl font-semibold mb-4">Profile Information</h3>
+                            <form onSubmit={handleProfileUpdate} className="space-y-4">
+                                <div>
+                                    <label htmlFor="profileName" className="block text-sm font-medium mb-2">Full Name</label>
+                                    <input
+                                        id="profileName"
+                                        type="text"
+                                        value={profile.name}
+                                        onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                                        className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="profileEmail" className="block text-sm font-medium mb-2">Email</label>
+                                    <input
+                                        id="profileEmail"
+                                        type="email"
+                                        value={profile.email}
+                                        onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                                        className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="profilePhone" className="block text-sm font-medium mb-2">Phone</label>
+                                    <input
+                                        id="profilePhone"
+                                        type="tel"
+                                        value={profile.phone}
+                                        onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                                        className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="pharmacy" className="block text-sm font-medium mb-2">Pharmacy Name</label>
+                                    <input
+                                        id="pharmacy"
+                                        type="text"
+                                        value={profile.pharmacy}
+                                        onChange={(e) => setProfile({ ...profile, pharmacy: e.target.value })}
+                                        className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    Update Profile
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    {/* Additional Settings */}
+                    <div className={`${darkMode ? 'dark-glassmorphism' : 'glassmorphism'} p-6 rounded-2xl`}>
+                        <h3 className="text-xl font-semibold mb-4">System Preferences</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label htmlFor="defaultCurrency" className="block text-sm font-medium mb-2">Default Currency</label>
+                                <select
+                                    id="defaultCurrency"
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                >
+                                    {currencies.map(curr => (
+                                        <option key={curr.code} value={curr.code}>
+                                            {curr.symbol} {curr.name} ({curr.code})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label htmlFor="lowStockAlert" className="block text-sm font-medium mb-2">Low Stock Alert Threshold</label>
+                                <input
+                                    id="lowStockAlert"
+                                    type="number"
+                                    defaultValue="10"
+                                    className={`w-full px-4 py-3 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Chatbot Component
+        const Chatbot = ({ darkMode, medicines, patients }) => {
+            const [messages, setMessages] = useState([
+                { id: 1, text: 'Hello! I\'m your PharmaFlow assistant. How can I help you today?', sender: 'bot' }
+            ]);
+            const [inputMessage, setInputMessage] = useState('');
+
+            const handleSendMessage = (e) => {
+                e.preventDefault();
+                if (!inputMessage.trim()) return;
+
+                const userMessage = { id: Date.now(), text: inputMessage, sender: 'user' };
+                setMessages(prev => [...prev, userMessage]);
+
+                // Simple chatbot responses
+                setTimeout(() => {
+                    let botResponse = '';
+                    const input = inputMessage.toLowerCase();
+
+                    if (input.includes('expired') || input.includes('expiry')) {
+                        const expiredCount = medicines.filter(med => new Date(med.expiryDate) <= new Date()).length;
+                        botResponse = `You have ${expiredCount} expired medicines. Would you like me to show you the expired medicines page?`;
+                    } else if (input.includes('patient') || input.includes('patients')) {
+                        botResponse = `You have ${patients.length} patients registered. You can manage them in the Patients section.`;
+                    } else if (input.includes('medicine') || input.includes('inventory')) {
+                        const lowStock = medicines.filter(med => med.quantity <= 10).length;
+                        botResponse = `You have ${medicines.length} medicines in inventory. ${lowStock} items are running low on stock.`;
+                    } else if (input.includes('hello') || input.includes('hi')) {
+                        botResponse = 'Hello! I can help you with information about medicines, patients, expired items, and more. What would you like to know?';
+                    } else {
+                        botResponse = 'I can help you with medicines, patients, expired items, inventory, and prescriptions. What specific information do you need?';
+                    }
+
+                    const botMessage = { id: Date.now() + 1, text: botResponse, sender: 'bot' };
+                    setMessages(prev => [...prev, botMessage]);
+                }, 1000);
+
+                setInputMessage('');
+            };
+
+            return (
+                <div className="flex flex-col h-full">
+                    <div className="p-4 border-b border-white/10">
+                        <h3 className="font-semibold">AI Assistant</h3>
+                    </div>
+
+                    <div className="flex-1 p-4 overflow-y-auto space-y-3">
+                        {messages.map(message => (
+                            <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[80%] p-3 rounded-lg ${message.sender === 'user'
+                                    ? 'bg-blue-600 text-white'
+                                    : (darkMode ? 'bg-blue-900/50' : 'bg-white/50')
+                                    }`}>
+                                    <p className="text-sm">{message.text}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <form onSubmit={handleSendMessage} className="p-4 border-t border-white/10">
+                        <div className="flex space-x-2">
+                            <input
+                                type="text"
+                                value={inputMessage}
+                                onChange={(e) => setInputMessage(e.target.value)}
+                                placeholder="Ask me anything..."
+                                className={`flex-1 px-3 py-2 rounded-lg border-0 ${darkMode ? 'bg-blue-900/50 text-white' : 'bg-white/50 text-gray-900'} focus:ring-2 focus:ring-blue-500`}
+                            />
+                            <button
+                                type="submit"
+                                className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                <i data-lucide="send" className="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            );
+        };
+
+        // Main App Component
+        const App = () => {
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [isSignUp, setIsSignUp] = useState(false);
+            const [darkMode, setDarkMode] = useState(false);
+            const [currentPage, setCurrentPage] = useState('dashboard');
+
+            const handleLogin = (userData) => {
+                setIsAuthenticated(true);
+            };
+
+            if (!isAuthenticated) {
+                return (
+                    <AuthPage
+                        onLogin={handleLogin}
+                        isSignUp={isSignUp}
+                        setIsSignUp={setIsSignUp}
+                    />
+                );
+            }
+
+            return (
+                <Dashboard
+                    darkMode={darkMode}
+                    setDarkMode={setDarkMode}
+                    currentPage={currentPage}
+                    setCurrentPage={setCurrentPage}
+                    setIsAuthenticated={setIsAuthenticated}
+                />
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+    <script>(function () { function c() { var b = a.contentDocument || a.contentWindow.document; if (b) { var d = b.createElement('script'); d.innerHTML = "window.__CF$cv$params={r:'98fd9b76d647087b',t:'MTc2MDY4MTE1OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);"; b.getElementsByTagName('head')[0].appendChild(d) } } if (document.body) { var a = document.createElement('iframe'); a.height = 1; a.width = 1; a.style.position = 'absolute'; a.style.top = 0; a.style.left = 0; a.style.border = 'none'; a.style.visibility = 'hidden'; document.body.appendChild(a); if ('loading' !== document.readyState) c(); else if (window.addEventListener) document.addEventListener('DOMContentLoaded', c); else { var e = document.onreadystatechange || function () { }; document.onreadystatechange = function (b) { e(b); 'loading' !== document.readyState && (document.onreadystatechange = e, c()) } } } })();</script>
+</body>
+
+</html>
